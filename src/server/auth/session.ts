@@ -26,6 +26,8 @@ const sessionSchema = z.object({
   department: z.string().max(100).nullable(),
   level: z.string().max(100).nullable(),
   branchId: z.number().int().positive().nullable(),
+  /** Admins see the Administration menu and approve submitted orders. */
+  isAdmin: z.boolean().default(false),
   loginAt: z.string().min(1).max(100),
 });
 

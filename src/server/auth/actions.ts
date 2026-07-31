@@ -34,6 +34,7 @@ export async function loginAction(_prev: LoginState, formData: FormData): Promis
     department: user.department,
     level: user.level,
     branchId: user.branchId ?? null,
+    isAdmin: user.isAdmin,
     loginAt: new Date().toISOString(),
   });
   redirect("/");

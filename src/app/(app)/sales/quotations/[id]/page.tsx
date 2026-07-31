@@ -9,7 +9,11 @@ import { Forbidden } from "@/components/forbidden";
 import { PageHeader } from "@/components/page-header";
 import { Table, TBody, TD, TH, THead, TR } from "@/components/ui/table";
 import { QuotationActions } from "@/components/quotation-actions";
+import { DecideSoButtons, PushAccurateButton, SoBadge, SubmitSoButton } from "@/components/so-actions";
 import { deleteQuotation, duplicateQuotation, reviseQuotation } from "@/server/actions/quotations";
+import { approveSo, pushToAccurate, rejectSo, submitForApproval } from "@/server/actions/so";
+import { getSession } from "@/server/auth/session";
+import { canDecide, canPushToAccurate, canSubmit, soBadge } from "@/lib/so-workflow";
 import { idr } from "@/lib/format";
 import { lineResult, type FxSnapshot } from "@/lib/pricing";
 import type { Currency } from "@/lib/constants";
@@ -49,6 +53,8 @@ export default async function QuotationDetailPage({ params }: { params: Promise<
     can("Quotation", "create"),
     can("Quotation", "destroy"),
   ]);
+  const session = await getSession();
+  const viewer = { id: session?.uid ?? 0, isAdmin: session?.isAdmin ?? false };
 
   const fx: FxSnapshot = {
     usdIdr: q.q.fxUsdIdr ?? 0,
@@ -101,6 +107,48 @@ export default async function QuotationDetailPage({ params }: { params: Promise<
         <Info label="Sales" value={q.salesName ?? "—"} />
         <Info label="Company / Status" value={`${q.q.companyName ?? "—"} · ${q.q.qStatus ?? "—"}`} />
       </div>
+
+      {/* SQ -> SO workflow */}
+      <section className="rounded-lg border border-border bg-card p-5">
+        <div className="mb-3 flex items-center gap-3">
+          <h2 className="text-sm font-semibold uppercase tracking-wide text-brand">Status SO</h2>
+          <SoBadge {...soBadge(q.q)} />
+          {q.q.accurateSoNumber && (
+            <span className="font-mono text-xs text-muted">Accurate: {q.q.accurateSoNumber}</span>
+          )}
+        </div>
+        {q.q.soRejectionReason && (
+          <p className="mb-3 rounded border border-accent/30 bg-accent/5 px-3 py-2 text-sm text-accent">
+            Ditolak: {q.q.soRejectionReason}
+          </p>
+        )}
+        <div className="flex flex-wrap items-start gap-4">
+          {canSubmit(q.q) && canEdit && <SubmitSoButton submit={submitForApproval.bind(null, quotationId)} />}
+          {canDecide(q.q, viewer) && (
+            <DecideSoButtons
+              approve={approveSo.bind(null, quotationId)}
+              reject={async (reason: string) => {
+                "use server";
+                const fd = new FormData();
+                fd.set("reason", reason);
+                return rejectSo(quotationId, {}, fd);
+              }}
+            />
+          )}
+          {canPushToAccurate(q.q, viewer) && (
+            <PushAccurateButton push={pushToAccurate.bind(null, quotationId)} />
+          )}
+          {!canSubmit(q.q) && !canDecide(q.q, viewer) && !canPushToAccurate(q.q, viewer) && (
+            <p className="text-sm text-muted">
+              {q.q.accurateSyncedAt
+                ? "Sudah dikirim ke Accurate."
+                : q.q.soStatus === "SUBMITTED"
+                  ? "Menunggu persetujuan admin."
+                  : "Tidak ada aksi tersedia."}
+            </p>
+          )}
+        </div>
+      </section>
 
       <div>
         <h2 className="mb-2 text-sm font-semibold uppercase tracking-wide text-brand">Items</h2>

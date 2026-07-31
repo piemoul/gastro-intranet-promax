@@ -7,7 +7,7 @@ import { logoutAction } from "@/server/auth/actions";
 type NavItem = { label: string; href: string };
 type NavGroup = { label: string; href?: string; items?: NavItem[]; show: boolean };
 
-async function buildNav(): Promise<NavGroup[]> {
+async function buildNav(isAdmin: boolean): Promise<NavGroup[]> {
   const [canItems, canCustomers, canQuotations] = await Promise.all([
     can("Item", "index"),
     can("Customer", "index"),
@@ -17,7 +17,7 @@ async function buildNav(): Promise<NavGroup[]> {
     { label: "Home", href: "/", show: true },
     {
       label: "Administration",
-      show: true, // TODO: gate by department (FA / admin) once full roles are seeded
+      show: isAdmin, // sales users never see this menu
       items: [
         { label: "Users", href: "/admin/users" },
         { label: "Roles", href: "/admin/roles" },
@@ -39,7 +39,8 @@ async function buildNav(): Promise<NavGroup[]> {
       show: canCustomers || canQuotations,
       items: [
         ...(canCustomers ? [{ label: "Customers", href: "/sales/customers" }] : []),
-        ...(canQuotations ? [{ label: "Quotations", href: "/sales/quotations" }] : []),
+        ...(canQuotations ? [{ label: "Quotations (SQ)", href: "/sales/quotations" }] : []),
+        ...(canQuotations && isAdmin ? [{ label: "Approval SO", href: "/sales/approvals" }] : []),
       ],
     },
     {
@@ -65,7 +66,7 @@ export async function AppShell({
   session: Session;
   children: React.ReactNode;
 }) {
-  const nav = (await buildNav()).filter((g) => g.show);
+  const nav = (await buildNav(session.isAdmin)).filter((g) => g.show);
 
   return (
     <>

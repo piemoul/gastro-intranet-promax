@@ -72,6 +72,8 @@ export const users = pgTable(
     branchId: integer("branch_id").references(() => branches.id),
     passwordHash: text("password_hash"),
     active: boolean("active").notNull().default(true),
+    /** Admin sees the Administration menu and approves submitted quotations. */
+    isAdmin: boolean("is_admin").notNull().default(false),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
   },
@@ -145,7 +147,20 @@ export const items = pgTable(
   {
     id: serial("id").primaryKey(),
     legacyId: integer("legacy_id").unique(),
-    sysId: text("sys_id").notNull().unique(),
+    /**
+     * Item code. Sourced from Accurate (`item.no`) so it can be sent straight to
+     * `sales-quotation/save.do` as detailItem[n].itemNo. Unique PER COMPANY —
+     * each Accurate company keeps its own catalog.
+     */
+    sysId: text("sys_id").notNull(),
+    /** Accurate company this item belongs to: 1=GASTRO, 2=RSP, 3=SARANA. */
+    accurateCompanyId: integer("accurate_company_id"),
+    /** Accurate's internal item id (for detail lookups). */
+    accurateId: integer("accurate_id"),
+    /** Accurate unit name (unit1Name) — sent as detailItem[n].itemUnitName. */
+    unitName: text("unit_name"),
+    itemType: text("item_type"),
+    suspended: boolean("suspended").notNull().default(false),
     itemCode: text("item_code"),
     model: text("model"),
     brandId: integer("brand_id").references(() => itemBrands.id),
@@ -177,12 +192,14 @@ export const items = pgTable(
     updatedAt: updatedAt(),
   },
   (t) => [
+    uniqueIndex("items_company_sysid_idx").on(t.accurateCompanyId, t.sysId),
     index("items_brand_idx").on(t.brandId),
     index("items_category_idx").on(t.categoryId),
     index("items_sub1_idx").on(t.subCategory1Id),
     index("items_sub2_idx").on(t.subCategory2Id),
     index("items_series_idx").on(t.seriesId),
     index("items_model_idx").on(t.model),
+    index("items_accurate_idx").on(t.accurateCompanyId, t.accurateId),
   ],
 );
 
@@ -242,6 +259,15 @@ export const customers = pgTable(
     pics: jsonb("pics").notNull().default(sql`'[]'::jsonb`),
     defaultSalesId: integer("default_sales_id").references(() => users.id),
     branchId: integer("branch_id").references(() => branches.id),
+    /**
+     * Accurate linkage. Salesmen create customers here first; the customer is
+     * only pushed to Accurate when an approved SO needs it. Null = not yet in
+     * Accurate. Scoped by company because each Accurate DB has its own list.
+     */
+    accurateCompanyId: integer("accurate_company_id"),
+    accurateCustomerNo: text("accurate_customer_no"),
+    accurateId: integer("accurate_id"),
+    accurateSyncedAt: timestamp("accurate_synced_at", { withTimezone: true }),
     legacyCreatedAt: timestamp("legacy_created_at", { withTimezone: true }),
     legacyUpdatedAt: timestamp("legacy_updated_at", { withTimezone: true }),
     createdAt: createdAt(),
@@ -302,6 +328,21 @@ export const quotations = pgTable(
     fxSekUsd: rate("fx_sek_usd"),
     createdById: integer("created_by_id").references(() => users.id),
     updatedById: integer("updated_by_id").references(() => users.id),
+    /**
+     * SQ → SO workflow. A salesman submits an SQ for approval; an admin approves
+     * or rejects it; only an APPROVED order is pushed to Accurate.
+     * soStatus: null (still an SQ) | SUBMITTED | APPROVED | REJECTED
+     */
+    soStatus: text("so_status"),
+    soSubmittedAt: timestamp("so_submitted_at", { withTimezone: true }),
+    soSubmittedById: integer("so_submitted_by_id").references(() => users.id),
+    soApprovedAt: timestamp("so_approved_at", { withTimezone: true }),
+    soApprovedById: integer("so_approved_by_id").references(() => users.id),
+    soRejectionReason: text("so_rejection_reason"),
+    /** Set once the approved order has been pushed to Accurate. */
+    accurateSoNumber: text("accurate_so_number"),
+    accurateSoId: integer("accurate_so_id"),
+    accurateSyncedAt: timestamp("accurate_synced_at", { withTimezone: true }),
     legacyCreatedAt: timestamp("legacy_created_at", { withTimezone: true }),
     legacyUpdatedAt: timestamp("legacy_updated_at", { withTimezone: true }),
     createdAt: createdAt(),
@@ -309,6 +350,7 @@ export const quotations = pgTable(
   },
   (t) => [
     index("quotations_qcode_idx").on(t.qCode),
+    index("quotations_so_status_idx").on(t.soStatus),
     index("quotations_customer_idx").on(t.customerId),
     index("quotations_sales_idx").on(t.salesId),
     index("quotations_branch_idx").on(t.branchId),
