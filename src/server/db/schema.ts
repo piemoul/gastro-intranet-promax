@@ -237,6 +237,9 @@ export const customers = pgTable(
     picName: text("pic_name"),
     picPhone: text("pic_phone"),
     picEmail: text("pic_email"),
+    /** Legacy allows several PICs per customer (customer_pics_attributes[]); the
+     * primary one is mirrored into pic_* above, the full list is kept here. */
+    pics: jsonb("pics").notNull().default(sql`'[]'::jsonb`),
     defaultSalesId: integer("default_sales_id").references(() => users.id),
     branchId: integer("branch_id").references(() => branches.id),
     legacyCreatedAt: timestamp("legacy_created_at", { withTimezone: true }),

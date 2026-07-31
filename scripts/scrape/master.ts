@@ -224,10 +224,9 @@ async function importItemSubResources(legacyItemId: number, itemId: number) {
 }
 
 /* ---------- customers ---------- */
-const KNOWN_CUST_COLS = new Set([
-  "cust_code", "company_name", "brand", "group_name", "category", "address",
-  "pic_name", "pic_phone", "pic_email", "default_sales_id", "branch_id",
-]);
+/** Join the non-empty parts of a multi-line legacy field (office_address_1..3). */
+const joinParts = (...vals: (string | undefined)[]) =>
+  vals.map((v) => v?.trim()).filter(Boolean).join(", ") || null;
 
 async function importCustomers() {
   const cp = await loadCheckpoint("customers");
@@ -239,19 +238,32 @@ async function importCustomers() {
   for (let id = cp.next; id <= MAX_CUSTOMER_ID; id++) {
     const html = await getArchived(`/customers/${id}/edit`, `customers/${id}-edit`);
     if (html) {
-      const { fields: f, selectedText } = parseForm(html);
+      const { fields: f, selectedText, nested } = parseForm(html);
       if (f.cust_code) {
+        // Legacy field names are prefixed (cust_company_name), the address is split
+        // across three lines, and PICs are a nested collection.
+        const picRows = (nested.customer_pics_attributes ?? []).filter(
+          (p) => (p.pic_name ?? "").trim() !== "" && p._destroy !== "1",
+        );
+        const pics = picRows.map((p) => ({
+          name: p.pic_name?.trim() ?? "",
+          position: p.pic_position?.trim() || null,
+          email: joinParts(p.pic_email_1, p.pic_email_2, p.pic_email_3),
+          phone: joinParts(p.pic_phone_1, p.pic_phone_2, p.pic_phone_3),
+        }));
+        const primary = pics[0];
         const values = {
           legacyId: id,
           custCode: f.cust_code,
-          companyName: f.company_name || null,
-          brand: f.brand || null,
-          groupName: f.group_name || null,
-          category: f.category || null,
-          address: f.address || null,
-          picName: f.pic_name || null,
-          picPhone: f.pic_phone || null,
-          picEmail: f.pic_email || null,
+          companyName: f.cust_company_name || null,
+          brand: f.cust_alias || null,
+          groupName: f.cust_group_name || null,
+          category: selectedText.cust_category_id || null,
+          address: joinParts(f.office_address_1, f.office_address_2, f.office_address_3),
+          picName: primary?.name ?? null,
+          picPhone: primary?.phone ?? null,
+          picEmail: primary?.email ?? null,
+          pics,
           defaultSalesId: f.default_sales_id ? (userByLegacy.get(Number(f.default_sales_id)) ?? null) : null,
           branchId: matchBranch(branchRows, selectedText.branch_id ?? f.branch_id) ?? null,
         };
