@@ -1,8 +1,12 @@
+import Link from "next/link";
 import { eq } from "drizzle-orm";
 import { db } from "@/server/db/client";
 import { branches, users } from "@/server/db/schema";
 import { PageHeader } from "@/components/page-header";
 import { Table, TBody, TD, TH, THead, TR } from "@/components/ui/table";
+import { buttonVariants } from "@/components/ui/button";
+import { RowActions } from "@/components/row-actions";
+import { deleteUser } from "@/server/actions/admin";
 
 export default async function UsersPage() {
   const rows = await db
@@ -21,7 +25,15 @@ export default async function UsersPage() {
 
   return (
     <div>
-      <PageHeader title="Users" subtitle={`${rows.length} pengguna`} />
+      <PageHeader
+        title="Users"
+        subtitle={`${rows.length} pengguna`}
+        action={
+          <Link href="/admin/users/new" className={buttonVariants()}>
+            User Baru
+          </Link>
+        }
+      />
       <Table>
         <THead>
           <TR>
@@ -30,6 +42,7 @@ export default async function UsersPage() {
             <TH>Departemen</TH>
             <TH>Level</TH>
             <TH>Branch</TH>
+            <TH className="w-32" />
           </TR>
         </THead>
         <TBody>
@@ -40,6 +53,13 @@ export default async function UsersPage() {
               <TD>{u.department ?? "—"}</TD>
               <TD>{u.level ?? "—"}</TD>
               <TD>{u.branch ?? "—"}</TD>
+              <TD>
+                <RowActions
+                  editHref={`/admin/users/${u.id}/edit`}
+                  remove={deleteUser.bind(null, u.id)}
+                  confirmText={`Hapus user "${u.name}"?`}
+                />
+              </TD>
             </TR>
           ))}
         </TBody>

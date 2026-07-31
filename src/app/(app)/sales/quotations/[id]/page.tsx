@@ -3,11 +3,13 @@ import { notFound } from "next/navigation";
 import Decimal from "decimal.js";
 import { aliasedTable, eq } from "drizzle-orm";
 import { db } from "@/server/db/client";
-import { customers, quotationItems, quotations, users } from "@/server/db/schema";
+import { customers, quotationAdditionalItems, quotationItems, quotations, users } from "@/server/db/schema";
 import { can } from "@/server/auth/guard";
 import { Forbidden } from "@/components/forbidden";
 import { PageHeader } from "@/components/page-header";
 import { Table, TBody, TD, TH, THead, TR } from "@/components/ui/table";
+import { QuotationActions } from "@/components/quotation-actions";
+import { deleteQuotation, duplicateQuotation, reviseQuotation } from "@/server/actions/quotations";
 import { idr } from "@/lib/format";
 import { lineResult, type FxSnapshot } from "@/lib/pricing";
 import type { Currency } from "@/lib/constants";
@@ -36,11 +38,17 @@ export default async function QuotationDetailPage({ params }: { params: Promise<
     .limit(1);
   if (!q) notFound();
 
-  const lines = await db
-    .select()
-    .from(quotationItems)
-    .where(eq(quotationItems.quotationId, quotationId))
-    .orderBy(quotationItems.lineNo);
+  const [lines, extras, canEdit, canCreate, canDelete] = await Promise.all([
+    db.select().from(quotationItems).where(eq(quotationItems.quotationId, quotationId)).orderBy(quotationItems.lineNo),
+    db
+      .select()
+      .from(quotationAdditionalItems)
+      .where(eq(quotationAdditionalItems.quotationId, quotationId))
+      .orderBy(quotationAdditionalItems.lineNo),
+    can("Quotation", "update"),
+    can("Quotation", "create"),
+    can("Quotation", "destroy"),
+  ]);
 
   const fx: FxSnapshot = {
     usdIdr: q.q.fxUsdIdr ?? 0,
@@ -67,7 +75,8 @@ export default async function QuotationDetailPage({ params }: { params: Promise<
     );
     return { ln, sellIdr: r.sellIdr };
   });
-  const total = computed.reduce((s, c) => s.add(c.sellIdr), new Decimal(0));
+  const extrasTotal = extras.reduce((s, x) => s.add(new Decimal(x.amount ?? 0)), new Decimal(0));
+  const total = computed.reduce((s, c) => s.add(c.sellIdr), new Decimal(0)).add(extrasTotal);
 
   return (
     <div className="space-y-6">
@@ -75,12 +84,15 @@ export default async function QuotationDetailPage({ params }: { params: Promise<
         title={q.q.qCode ?? `Quotation #${q.q.id}`}
         subtitle={q.q.qSubject ?? undefined}
         action={
-          <Link
-            href={`/sales/quotations/${quotationId}/pdf`}
-            className="inline-flex h-9 items-center rounded-md bg-brand px-4 text-sm font-medium text-white hover:bg-brand-dark"
-          >
-            PDF
-          </Link>
+          <QuotationActions
+            id={quotationId}
+            duplicate={duplicateQuotation.bind(null, quotationId)}
+            revise={reviseQuotation.bind(null, quotationId)}
+            remove={deleteQuotation.bind(null, quotationId)}
+            canEdit={canEdit}
+            canCreate={canCreate}
+            canDelete={canDelete}
+          />
         }
       />
 
@@ -123,6 +135,28 @@ export default async function QuotationDetailPage({ params }: { params: Promise<
             ))}
           </TBody>
         </Table>
+        {extras.length > 0 && (
+          <div className="mt-4">
+            <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted">Additional Items</h3>
+            <Table>
+              <THead>
+                <TR>
+                  <TH>Nama</TH>
+                  <TH className="text-right">Subtotal</TH>
+                </TR>
+              </THead>
+              <TBody>
+                {extras.map((x) => (
+                  <TR key={x.id}>
+                    <TD>{x.label ?? "—"}</TD>
+                    <TD className="text-right tabular-nums">{idr(x.amount)}</TD>
+                  </TR>
+                ))}
+              </TBody>
+            </Table>
+          </div>
+        )}
+
         <div className="mt-3 flex justify-end">
           <div className="rounded-lg border border-border bg-brand-light px-6 py-3 text-right">
             <div className="text-xs uppercase tracking-wide text-muted">Total (exc. PPN)</div>

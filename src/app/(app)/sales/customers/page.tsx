@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { and, desc, eq, ilike, or } from "drizzle-orm";
 import { db } from "@/server/db/client";
 import { branches, customers, users } from "@/server/db/schema";
@@ -5,6 +6,7 @@ import { can, scopeWhere } from "@/server/auth/guard";
 import { Forbidden } from "@/components/forbidden";
 import { PageHeader, SearchBox } from "@/components/page-header";
 import { Table, TBody, TD, TH, THead, TR } from "@/components/ui/table";
+import { buttonVariants } from "@/components/ui/button";
 
 export default async function CustomersPage({
   searchParams,
@@ -13,6 +15,7 @@ export default async function CustomersPage({
 }) {
   if (!(await can("Customer", "index"))) return <Forbidden what="Customers" />;
   const { q } = await searchParams;
+  const canCreate = await can("Customer", "create");
 
   const scope = await scopeWhere("Customer", "index");
   const search = q
@@ -42,7 +45,17 @@ export default async function CustomersPage({
 
   return (
     <div>
-      <PageHeader title="Customers" subtitle="Daftar pelanggan (difilter sesuai izin Anda)" />
+      <PageHeader
+        title="Customers"
+        subtitle="Daftar pelanggan (difilter sesuai izin Anda)"
+        action={
+          canCreate ? (
+            <Link href="/sales/customers/new" className={buttonVariants()}>
+              Customer Baru
+            </Link>
+          ) : undefined
+        }
+      />
       <SearchBox placeholder="Cari kode / perusahaan / group…" defaultValue={q ?? ""} />
       <Table>
         <THead>
@@ -64,7 +77,11 @@ export default async function CustomersPage({
           )}
           {rows.map((r) => (
             <TR key={r.id}>
-              <TD className="font-mono text-xs">{r.custCode}</TD>
+              <TD className="font-mono text-xs">
+                <Link href={`/sales/customers/${r.id}`} className="text-brand hover:underline">
+                  {r.custCode}
+                </Link>
+              </TD>
               <TD className="font-medium text-brand-dark">{r.companyName ?? "—"}</TD>
               <TD>{r.groupName ?? "—"}</TD>
               <TD>{r.category ?? "—"}</TD>

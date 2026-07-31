@@ -1,7 +1,11 @@
+import Link from "next/link";
 import { db } from "@/server/db/client";
 import { taxonomies } from "@/server/db/schema";
 import { PageHeader } from "@/components/page-header";
 import { Table, TBody, TD, TH, THead, TR } from "@/components/ui/table";
+import { buttonVariants } from "@/components/ui/button";
+import { RowActions } from "@/components/row-actions";
+import { deleteTaxonomy } from "@/server/actions/admin";
 import { TAXONOMY_KINDS } from "@/lib/constants";
 
 const KIND_LABEL: Record<string, string> = {
@@ -19,7 +23,15 @@ export default async function ItemCategoriesPage() {
 
   return (
     <div className="space-y-6">
-      <PageHeader title="Item Categories" subtitle="Taksonomi katalog (category → sub → series)" />
+      <PageHeader
+        title="Item Categories"
+        subtitle="Taksonomi katalog (category → sub → series)"
+        action={
+          <Link href="/items/categories/new" className={buttonVariants()}>
+            Kategori Baru
+          </Link>
+        }
+      />
       {rows.length === 0 && (
         <div className="rounded-lg border border-border bg-card p-8 text-center text-muted">
           Belum ada taksonomi. Jalankan <code className="text-brand">npm run scrape:master</code>.
@@ -35,12 +47,20 @@ export default async function ItemCategoriesPage() {
               <THead>
                 <TR>
                   <TH>Nama</TH>
+                  <TH className="w-32" />
                 </TR>
               </THead>
               <TBody>
                 {byKind[k].slice(0, 50).map((t) => (
                   <TR key={t.id}>
                     <TD>{t.name}</TD>
+                    <TD>
+                      <RowActions
+                        editHref={`/items/categories/${t.id}/edit`}
+                        remove={deleteTaxonomy.bind(null, t.id)}
+                        confirmText={`Hapus "${t.name}"?`}
+                      />
+                    </TD>
                   </TR>
                 ))}
               </TBody>

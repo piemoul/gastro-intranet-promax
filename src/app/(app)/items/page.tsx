@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { desc, ilike, or, sql } from "drizzle-orm";
 import { db } from "@/server/db/client";
 import { itemBrands, items } from "@/server/db/schema";
@@ -5,7 +6,7 @@ import { can } from "@/server/auth/guard";
 import { Forbidden } from "@/components/forbidden";
 import { PageHeader, SearchBox } from "@/components/page-header";
 import { Table, TBody, TD, TH, THead, TR } from "@/components/ui/table";
-import { idr } from "@/lib/format";
+import { buttonVariants } from "@/components/ui/button";
 
 export default async function ItemsPage({
   searchParams,
@@ -14,6 +15,7 @@ export default async function ItemsPage({
 }) {
   if (!(await can("Item", "index"))) return <Forbidden what="Items" />;
   const { q } = await searchParams;
+  const canCreate = await can("Item", "create");
 
   const where = q
     ? or(ilike(items.sysId, `%${q}%`), ilike(items.model, `%${q}%`), ilike(items.description, `%${q}%`))
@@ -38,7 +40,17 @@ export default async function ItemsPage({
 
   return (
     <div>
-      <PageHeader title="Items" subtitle="Katalog peralatan dapur komersial" />
+      <PageHeader
+        title="Items"
+        subtitle="Katalog peralatan dapur komersial"
+        action={
+          canCreate ? (
+            <Link href="/items/new" className={buttonVariants()}>
+              Item Baru
+            </Link>
+          ) : undefined
+        }
+      />
       <SearchBox placeholder="Cari SYSID / model / deskripsi…" defaultValue={q ?? ""} />
       <Table>
         <THead>
@@ -60,7 +72,11 @@ export default async function ItemsPage({
           )}
           {rows.map((r) => (
             <TR key={r.id}>
-              <TD className="font-mono text-xs">{r.sysId}</TD>
+              <TD className="font-mono text-xs">
+                <Link href={`/items/${r.id}`} className="text-brand hover:underline">
+                  {r.sysId}
+                </Link>
+              </TD>
               <TD className="font-medium text-brand-dark">{r.model ?? "—"}</TD>
               <TD>{r.brand ?? "—"}</TD>
               <TD className="max-w-md truncate text-muted">{r.description ?? "—"}</TD>

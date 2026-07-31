@@ -6,6 +6,7 @@ import { can, scopeWhere } from "@/server/auth/guard";
 import { Forbidden } from "@/components/forbidden";
 import { PageHeader, SearchBox } from "@/components/page-header";
 import { Table, TBody, TD, TH, THead, TR } from "@/components/ui/table";
+import { buttonVariants } from "@/components/ui/button";
 import { date } from "@/lib/format";
 
 const STATUS_STYLES: Record<string, string> = {
@@ -21,6 +22,7 @@ export default async function QuotationsPage({
 }) {
   if (!(await can("Quotation", "index"))) return <Forbidden what="Quotations" />;
   const { q } = await searchParams;
+  const canCreate = await can("Quotation", "create");
 
   const sales = aliasedTable(users, "sales");
   const scope = await scopeWhere("Quotation", "index");
@@ -48,7 +50,17 @@ export default async function QuotationsPage({
 
   return (
     <div>
-      <PageHeader title="Quotations" subtitle="Kelola penawaran (difilter sesuai izin Anda)" />
+      <PageHeader
+        title="Quotations"
+        subtitle="Kelola penawaran (difilter sesuai izin Anda)"
+        action={
+          canCreate ? (
+            <Link href="/sales/quotations/new" className={buttonVariants()}>
+              Quotation Baru
+            </Link>
+          ) : undefined
+        }
+      />
       <SearchBox placeholder="Cari kode / subjek…" defaultValue={q ?? ""} />
       <Table>
         <THead>

@@ -1,7 +1,11 @@
+import Link from "next/link";
 import { db } from "@/server/db/client";
 import { permissions } from "@/server/db/schema";
 import { PageHeader } from "@/components/page-header";
 import { Table, TBody, TD, TH, THead, TR } from "@/components/ui/table";
+import { buttonVariants } from "@/components/ui/button";
+import { RowActions } from "@/components/row-actions";
+import { deletePermission } from "@/server/actions/admin";
 
 export default async function RolesPage() {
   const rows = await db
@@ -14,6 +18,11 @@ export default async function RolesPage() {
       <PageHeader
         title="Roles"
         subtitle="Matriks izin baris-per-baris (department × level × Model::action × scope)"
+        action={
+          <Link href="/admin/roles/new" className={buttonVariants()}>
+            Aturan Baru
+          </Link>
+        }
       />
       <Table>
         <THead>
@@ -23,6 +32,7 @@ export default async function RolesPage() {
             <TH>Model::Action</TH>
             <TH>Scope</TH>
             <TH>Field (source / dest)</TH>
+            <TH className="w-32" />
           </TR>
         </THead>
         <TBody>
@@ -42,6 +52,13 @@ export default async function RolesPage() {
               </TD>
               <TD className="font-mono text-xs text-muted">
                 {r.sourceField && r.destField ? `${r.sourceField} / ${r.destField}` : "—"}
+              </TD>
+              <TD>
+                <RowActions
+                  editHref={`/admin/roles/${r.id}/edit`}
+                  remove={deletePermission.bind(null, r.id)}
+                  confirmText={`Hapus aturan ${r.model}::${r.action} untuk ${r.department}?`}
+                />
               </TD>
             </TR>
           ))}
