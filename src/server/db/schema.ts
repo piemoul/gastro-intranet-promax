@@ -64,8 +64,11 @@ export const users = pgTable(
     email: text("email").notNull().unique(),
     name: text("name").notNull(),
     nickname: text("nickname"),
-    department: departmentEnum("department"),
-    level: levelEnum("level"),
+    // Kept as text (not enum): scraped user data carries departments/levels beyond
+    // the controlled permission set (e.g. PURCHASING, DIREKSI). The permission engine
+    // fails safe on unknown values (no matching rule → no access).
+    department: text("department"),
+    level: text("level"),
     branchId: integer("branch_id").references(() => branches.id),
     passwordHash: text("password_hash"),
     active: boolean("active").notNull().default(true),

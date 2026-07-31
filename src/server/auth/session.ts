@@ -2,7 +2,6 @@ import "server-only";
 import { cookies } from "next/headers";
 import { SignJWT, jwtVerify, type JWTPayload } from "jose";
 import { z } from "zod";
-import { DEPARTMENTS, LEVELS } from "@/lib/constants";
 
 const COOKIE = "gastro_intranet_session";
 const MAX_AGE = 60 * 60 * 12; // 12 hours
@@ -24,8 +23,8 @@ const sessionSchema = z.object({
   uid: z.number().int().positive(),
   email: z.string().email(),
   name: z.string().trim().min(1).max(200),
-  department: z.enum(DEPARTMENTS).nullable(),
-  level: z.enum(LEVELS).nullable(),
+  department: z.string().max(100).nullable(),
+  level: z.string().max(100).nullable(),
   branchId: z.number().int().positive().nullable(),
   loginAt: z.string().min(1).max(100),
 });

@@ -34,11 +34,15 @@ export type Rule = {
   destField: string | null;
 };
 
-/** The authenticated actor's attributes the engine reasons over. */
+/**
+ * The authenticated actor's attributes the engine reasons over. `department` and
+ * `level` are plain strings (not the enums) because real users carry values
+ * outside the controlled permission set; the engine fails safe on unknowns.
+ */
 export type Actor = {
   id: number;
-  department: Department | null;
-  level: Level | null;
+  department: string | null;
+  level: string | null;
   branchId: number | null;
 };
 
@@ -57,7 +61,8 @@ function departmentMatches(rule: Rule, actor: Actor): boolean {
 /** Is the actor's level within the rule's [min..max] range (inclusive)? */
 function levelInRange(rule: Rule, actor: Actor): boolean {
   if (!actor.level) return false;
-  const lvl = LEVEL_ORDER[actor.level];
+  const lvl = LEVEL_ORDER[actor.level as Level];
+  if (lvl == null) return false; // unknown level → fails safe
   return lvl >= LEVEL_ORDER[rule.levelMin] && lvl <= LEVEL_ORDER[rule.levelMax];
 }
 

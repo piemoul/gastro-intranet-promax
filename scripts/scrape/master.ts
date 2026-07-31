@@ -26,7 +26,6 @@ import {
 import { getArchived, StaleSessionError } from "./legacy-client";
 import { parseForm, parseIndexTable, parseNameValueTable, parseSelectOptions } from "./parse";
 import { loadCheckpoint, saveCheckpoint } from "./checkpoint";
-import type { Department, Level } from "@/lib/constants";
 
 const MAX_ITEM_ID = Number(process.env.SCRAPE_MAX_ITEM_ID ?? 7600);
 const MAX_CUSTOMER_ID = Number(process.env.SCRAPE_MAX_CUSTOMER_ID ?? 6000);
@@ -74,22 +73,33 @@ async function importUsers() {
     // columns: E-mail | Name | Nickname | Department (Level) | Branch
     const [email, name, nickname, deptLevel, branchName] = r.cells;
     if (!email) continue;
+    // The row's edit/show link carries the legacy id: /users/<id>[/edit].
+    const legacyId = Number(r.links.map((l) => l.match(/\/users\/(\d+)/)?.[1]).find(Boolean));
     const dm = deptLevel?.match(/^(.*?)\s*\(Level:\s*(.*?)\)/);
-    const department = (dm?.[1]?.trim() ?? null) as Department | null;
-    const level = (dm?.[2]?.trim() ?? null) as Level | null;
+    const department = dm?.[1]?.trim() || null;
+    const level = dm?.[2]?.trim() || null;
+    const branchId = branchName ? (branchByName.get(branchName.trim()) ?? null) : null;
     await db
       .insert(users)
       .values({
+        legacyId: Number.isFinite(legacyId) ? legacyId : null,
         email: email.toLowerCase(),
         name: name || email,
         nickname: nickname || null,
         department,
         level,
-        branchId: branchName ? (branchByName.get(branchName.trim()) ?? null) : null,
+        branchId,
       })
       .onConflictDoUpdate({
         target: users.email,
-        set: { name: name || email, nickname: nickname || null, department, level },
+        set: {
+          legacyId: Number.isFinite(legacyId) ? legacyId : null,
+          name: name || email,
+          nickname: nickname || null,
+          department,
+          level,
+          branchId,
+        },
       });
     n++;
   }
