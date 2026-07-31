@@ -1,0 +1,32 @@
+@import "tailwindcss";
+
+:root {
+  --background: #f0f2f5; /* same app surface as the other Gastro webapps */
+  --foreground: #171717; /* neutral-900 */
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-inter);
+  --font-mono: var(--font-geist-mono);
+  /* GASTRO palette (matches the gastro website): navy brand + red accent. */
+  --color-brand: #1d406f;
+  --color-brand-dark: #152b4a;
+  --color-brand-light: #f1f5fb;
+  --color-accent: #c8102e;
+  /* shadcn-style neutral tokens */
+  --color-border: #e2e8f0;
+  --color-muted: #64748b;
+  --color-card: #ffffff;
+}
+
+html,
+body {
+  height: 100%;
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+}

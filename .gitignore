@@ -1,0 +1,36 @@
+# dependencies
+/node_modules
+/.pnp
+.pnp.*
+
+# next.js
+/.next/
+/out/
+next-env.d.ts
+
+# production
+/build
+
+# misc
+.DS_Store
+*.pem
+*.tsbuildinfo
+
+# debug
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# env files (contain Neon + legacy credentials)
+.env
+.env*.local
+Untitled.rtf
+.~titled.rtf
+
+# vercel
+.vercel
+
+# scraper output (raw HTML archive + checkpoints can be large / sensitive)
+/scripts/scrape/raw/
+/scripts/scrape/.checkpoint*.json
+/scripts/scrape/cookie.txt
