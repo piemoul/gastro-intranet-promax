@@ -31,7 +31,7 @@ export async function verifyPublishedOrder(draft:Draft,id:number,documentNumber:
   if(doc.id!==id||doc.number!==documentNumber||!doc.header.description.split("\n").includes(draft.publication.marker)||doc.header.partnerId!==p.partnerId||doc.header.partnerNo!==p.partnerNo||doc.currency!==p.currency||doc.lines.length!==p.lines.length||doc.header.exchangeRate!==p.exchangeRate||doc.header.inclusiveTax!==p.inclusiveTax||Number(doc.header.discountPercent||0)!==p.discountPercent) return fail();
   const expected=[...p.lines];
   for(const actual of doc.lines) {
-    const index=expected.findIndex(l=>l.itemId===actual.itemId&&l.itemNo===actual.itemNo&&l.unit===actual.unit&&l.quantity===actual.quantity&&l.unitPrice===actual.unitPrice&&l.discountPercent===Number(actual.discountPercent||0));
+    const index=expected.findIndex(l=>l.itemId===actual.itemId&&l.itemNo===actual.itemNo&&l.unit===actual.unit&&l.quantity===actual.quantity&&l.unitPrice===actual.unitPrice&&(!l.warehouse||l.warehouse===actual.warehouseName)&&l.discountPercent===Number(actual.discountPercent||0));
     if(index<0)return fail();expected.splice(index,1);
   }
   const estimate=estimateTransaction(p);

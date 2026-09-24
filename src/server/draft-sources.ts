@@ -1,6 +1,6 @@
 import "server-only";
 import { createHash } from "node:crypto";
-import { getDocument,getItem,getCustomer,findPartnerByNo,findItemByNo,findCustomerByNo } from "./accurate";
+import { getWarehouses,getDocument,getItem,getCustomer,findPartnerByNo,findItemByNo,findCustomerByNo } from "./accurate";
 import { AuthError } from "./auth/users";
 import { emptyTransaction,emptyCustomer,emptyItem, type Actor,type DraftKind,type DraftPayload,type AccurateSource,type Draft } from "@/lib/domain";
 export const fingerprint=(value:unknown)=>createHash("sha256").update(JSON.stringify(value)).digest("hex");
@@ -15,6 +15,8 @@ export async function fromAccurate(actor:Actor,kind:AccurateSource["kind"],id:nu
 export async function validateAccurateReferences(actor:Actor,kind:DraftKind,payload:DraftPayload){
   if(payload.type==="item") { if(payload.no){const existing=await findItemByNo(actor.companyId,payload.no);if(existing&&existing.id!==payload.itemId)throw new AuthError("Kode barang sudah digunakan di Accurate PT ini.",409);}return; }
   if(payload.type==="customer"){if(payload.no){const existing=await findCustomerByNo(actor.companyId,payload.no);if(existing&&existing.id!==payload.customerId)throw new AuthError("Kode klien sudah digunakan di Accurate PT ini.",409);}return;}
+  const selectedWarehouses=[...new Set(payload.lines.map(line=>line.warehouse).filter(Boolean))];
+  if(selectedWarehouses.length){const warehouses=await getWarehouses(actor.companyId);for(const name of selectedWarehouses){if(warehouses.filter(w=>w.name===name).length!==1)throw new AuthError(`Gudang ${name} tidak aktif, tidak ditemukan, atau namanya tidak unik pada PT ini. Pilih ulang gudang dari Accurate.`,409);}}
   // Reads are scoped to selected item IDs. No full catalog scan or stock/serial lookup.
   const distinct=[...new Set(payload.lines.map(line=>line.itemId))];
   for(const id of distinct){const item=await getItem(actor.companyId,id);const lines=payload.lines.filter(x=>x.itemId===id);if(!item.active||lines.some(line=>line.itemNo!==item.no))throw new AuthError("Pilihan barang berubah atau tidak aktif. Pilih ulang barang dari master Accurate PT ini.",409);for(const line of lines){const units=new Set([item.unit,...item.units.map(u=>u.name)]);if(line.unit&&!units.has(line.unit))throw new AuthError(`Satuan ${line.unit} tidak sesuai master barang ${item.no}.`,409);}}

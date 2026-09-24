@@ -30,7 +30,8 @@ test("authenticated API integration uses isolated databases and allowlisted read
     reads.push({path:url.pathname,method,company:Number(token.at(-1))});
     const path=url.pathname.replace("/accurate/api/","");
     let data:unknown;
-    if(path==="item/detail.do")data=item;
+    if(path==="warehouse/list.do")data=[{id:1,name:"Utama",suspended:false},{id:2,name:"Nonaktif",suspended:true}];
+    else if(path==="item/detail.do")data=item;
     else if(path==="customer/detail.do")data=customer;
     else if(path==="sales-order/detail.do")data=order;
     else if(path==="item/list.do")data=url.searchParams.get("filter.no.val")&&url.searchParams.get("filter.no.val")!==item.no?[]:[item];
@@ -86,6 +87,17 @@ test("authenticated API integration uses isolated databases and allowlisted read
       assert.equal(result.items[0].id,32);
       assert.deepEqual(result.models,["Model 32"]);
       assert.equal(reads.at(-1)?.company,1);
+    });
+
+    await context.test("warehouse list is authenticated, scoped to the session company and excludes inactive rows",async()=>{
+      const before=reads.length;
+      assert.equal((await request("GET","accurate/warehouses")).status,401);assert.equal(reads.length,before);
+      const response=await request("GET","accurate/warehouses?companyId=3",tokens.importer);
+      assert.equal(response.status,200);assert.deepEqual((await response.json()).items,[{id:1,name:"Utama"}]);assert.equal(reads.at(-1)?.company,1);
+      const invalid=transaction();invalid.lines[0].warehouse="Nonaktif";
+      assert.equal((await request("POST","drafts",tokens.sales,{kind:"SQ",payload:invalid})).status,409);
+      invalid.lines[0].warehouse="Foreign PT warehouse";
+      assert.equal((await request("POST","drafts",tokens.sales,{kind:"SQ",payload:invalid})).status,409);
     });
 
     await context.test("staff can own local drafts but cannot read live transaction documents or other staff drafts",async()=>{
@@ -201,7 +213,7 @@ test("authenticated API integration uses isolated databases and allowlisted read
     });
 
     await context.test("final publish API requires confirmation, head access, CSRF and the approved version",async()=>{
-      const p=transaction();p.lines[0].taxPercent=0;
+      const p=transaction();p.lines[0].taxPercent=0;p.lines[0].warehouse="Utama";
       let d=await store.create(admin,{kind:"SQ",payload:p});
       for(const action of ["submit","approve","promote","submit","approve"] as const)d=await store.transition(admin,d.id,{version:d.version,action});
       const endpoint=`drafts/${d.id}/publish`,input={version:d.version,confirmed:true};
@@ -218,10 +230,10 @@ test("authenticated API integration uses isolated databases and allowlisted read
         if(init?.method==="POST") {
           assert.match(String(url),/sales-order\/save.do$/);writes++;
           const params=new URLSearchParams(String(init.body));description=params.get("description")!;
-          assert.equal(params.get("customerNo"),customer.customerNo);assert.equal(params.has("id"),false);
+          assert.equal(params.get("detailItem[0].warehouseName"),"Utama");assert.equal(params.get("customerNo"),customer.customerNo);assert.equal(params.has("id"),false);
           return Response.json({s:true,r:{id:81,number:"SO081"}});
         }
-        if(String(url).includes("sales-order/detail.do?id=81"))return Response.json({s:true,d:{...order,id:81,number:"SO081",description,taxable:false,tax1Rate:0,totalAmount:200,detailItem:[{...order.detailItem[0],useTax1:false}]}});
+        if(String(url).includes("sales-order/detail.do?id=81"))return Response.json({s:true,d:{...order,id:81,number:"SO081",description,taxable:false,tax1Rate:0,totalAmount:200,detailItem:[{...order.detailItem[0],warehouse:{name:"Utama"},useTax1:false}]}});
         return previous(url,init);
       };
       try {

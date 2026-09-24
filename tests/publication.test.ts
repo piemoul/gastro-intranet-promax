@@ -95,7 +95,7 @@ test("mapping preserves commercial fields, rejects unsupported data and cannot i
   try {
     const d=approved(store);const p=payload();d.payload={...p,currency:"USD",exchangeRate:15000,branch:"Main",paymentTerm:"NET30",shipDate:"2026-10-02",reference:"Supplier quote",description:"Description",discountPercent:2};
     const mapped=orderPayload(d,"marker");
-    assert.equal(mapped.vendorNo,p.partnerNo);assert.equal(mapped.transDate,"25/09/2026");assert.equal(mapped.shipDate,"02/10/2026");assert.equal(mapped.rate,"15000");assert.equal(mapped["detailItem[0].unitPrice"],"100");assert.equal(mapped["detailItem[0].itemDiscPercent"],"5");assert.equal(mapped["detailItem[0].useTax2"],"false");assert.equal(mapped.cashDiscPercent,"2");assert.equal(mapped.number,undefined);assert.equal(mapped.id,undefined);assert.match(mapped.description,/Referensi: Supplier quote/);
+    assert.equal(mapped.vendorNo,p.partnerNo);assert.equal(mapped.transDate,"25/09/2026");assert.equal(mapped.shipDate,"02/10/2026");assert.equal(mapped.rate,"15000");assert.equal(mapped["detailItem[0].unitPrice"],"100");assert.equal(mapped["detailItem[0].itemDiscPercent"],"5");assert.equal(mapped["detailItem[0].useTax2"],"false");assert.equal(mapped.cashDiscPercent,"2");assert.equal(mapped["detailItem[0].warehouseName"],"Utama");assert.equal(mapped.number,undefined);assert.equal(mapped.id,undefined);assert.match(mapped.description,/Referensi: Supplier quote/);
     d.payload={...p,customFields:{id:"999"}};assert.throws(()=>orderPayload(d,"marker"),/Field tambahan/);
     d.payload={...p,lines:[{...p.lines[0],taxPercent:12,taxBasePercent:91.666667}]};assert.throws(()=>orderPayload(d,"marker"),/DPP/);
     d.payload={...p,lines:[{...p.lines[0],sourceLineId:44}]};assert.throws(()=>orderPayload(d,"marker"),/diterbitkan ulang/);
@@ -126,9 +126,10 @@ test("read-back requires the correct reservation marker, partner, item and amoun
   try {
     process.env.ACCURATE_SIGNATURE_KEY="test";process.env.ACCURATE_API_TOKEN="test";
     const d=approved(store),reserved=store.reservePublication(head,d.id,d.version);
-    const body={id:80,number:"PO80",transDate:"25/09/2026",vendor:{id:17,vendorNo:"V-17"},currency:{code:"IDR"},rate:1,inclusiveTax:false,cashDiscPercent:"0",description:reserved.publication!.marker,totalAmount:190,detailItem:[{item:{id:32,no:"SKU32"},itemUnit:{name:"PCS"},quantity:2,unitPrice:100,itemDiscPercent:"5"}]};
+    const body={id:80,number:"PO80",transDate:"25/09/2026",vendor:{id:17,vendorNo:"V-17"},currency:{code:"IDR"},rate:1,inclusiveTax:false,cashDiscPercent:"0",description:reserved.publication!.marker,totalAmount:190,detailItem:[{item:{id:32,no:"SKU32"},itemUnit:{name:"PCS"},warehouse:{name:"Utama"},quantity:2,unitPrice:100,itemDiscPercent:"5"}]};
     globalThis.fetch=async(_url,init)=>{assert.equal(init?.method,"GET");return Response.json({s:true,d:body});};
     assert.deepEqual(await verifyPublishedOrder(reserved,80,"PO80"),{id:80,number:"PO80"});
+    body.detailItem[0].warehouse.name="Wrong";await assert.rejects(verifyPublishedOrder(reserved,80,"PO80"));body.detailItem[0].warehouse.name="Utama";
     body.description="other draft";await assert.rejects(verifyPublishedOrder(reserved,80,"PO80"));
     body.description=reserved.publication!.marker;body.totalAmount=210;await assert.rejects(verifyPublishedOrder(reserved,80,"PO80"));
   } finally {globalThis.fetch=original;for(const key of ["ACCURATE_SIGNATURE_KEY","ACCURATE_API_TOKEN"])if(old[key]===undefined)delete process.env[key];else process.env[key]=old[key];store.close();}

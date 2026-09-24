@@ -10,7 +10,7 @@ import { draftKindSchema,parseDraftPayload,draftActionSchema,versionSchema,reaso
 import { COMPANIES,type Actor } from "@/lib/domain";
 import { listDocuments,getDocument,searchItems,getItem,searchPartners,getConnectionStatus,searchCustomers,getCustomer } from "@/server/accurate";
 import { fromAccurate,validateAccurateReferences,validateSourceUnchanged } from "@/server/draft-sources";
-import { searchItemOptions } from "@/server/accurate";
+import { searchItemOptions, getWarehouses } from "@/server/accurate";
 export const dynamic="force-dynamic";
 export const runtime="nodejs";
 export const maxDuration=300;
@@ -28,6 +28,7 @@ export async function GET(request:Request,context:Context){return handle(async()
   if(route==="audit")return json({items:await getStore().auditAll(actor)});
   if(route==="accurate/documents"){const kind=documentKind.parse(url.searchParams.get("kind"));assertHead(actor,kind);return json(await listDocuments(actor.companyId,kind,{search,page}));}
   if(path[0]==="accurate"&&path[1]==="documents"&&path.length===4){const kind=documentKind.parse(path[2]);assertHead(actor,kind);return json({document:await getDocument(actor.companyId,kind,idSchema.parse(path[3]))});}
+  if(route==="accurate/warehouses")return json({items:await getWarehouses(actor.companyId)});
   if(route==="accurate/items")return json(await searchItems(actor.companyId,search,page));
   if(route==="accurate/item-options")return json(await searchItemOptions(actor.companyId,{search,brand:z.string().max(150).parse(url.searchParams.get("brand")||""),model:z.string().max(150).parse(url.searchParams.get("model")||""),page}));
   if(path[0]==="accurate"&&path[1]==="items"&&path.length===3)return json({item:await getItem(actor.companyId,idSchema.parse(path[2]))});

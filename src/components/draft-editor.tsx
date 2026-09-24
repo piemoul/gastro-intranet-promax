@@ -540,6 +540,9 @@ function TransactionFields({
   payload: TransactionPayload;
   onChange: (p: DraftPayload) => void;
 }) {
+  const [warehouseRefresh,setWarehouseRefresh]=useState(0);
+  const warehouseOptions=useResource<{items:{id:number;name:string}[]}>("/api/accurate/warehouses",warehouseRefresh);
+  const warehouses=warehouseOptions.data?.items||[];
   const latestPayload = useRef(p);
   useEffect(() => {
     latestPayload.current = p;
@@ -727,6 +730,8 @@ function TransactionFields({
           onSelect={(option) => void addItem(option)}
           disabled={adding}
         />
+        {warehouseOptions.error && <Notice error>Daftar gudang belum dapat dimuat. <button type="button" className="button button-secondary" onClick={()=>setWarehouseRefresh(n=>n+1)}>Coba muat gudang lagi</button></Notice>}
+        {!warehouseOptions.loading && !warehouseOptions.error && warehouses.length===0 && <Notice>Tidak ada gudang aktif yang tersedia di Accurate PT ini.</Notice>}
         {adding && <Loading label="Mengambil rincian barang…" />}
         {error && <Notice error>{error}</Notice>}
         {!p.lines.length ? (
@@ -830,20 +835,18 @@ function TransactionFields({
                     />
                   </Field>
                 </div>
+                <Field label={kind === "PO" ? "Gudang tujuan" : "Gudang pengeluaran"} hint="Pilihan dari Accurate PT aktif. Dapat berbeda untuk setiap barang.">
+                  <select value={line.warehouse} disabled={warehouseOptions.loading || !!warehouseOptions.error} onChange={e=>lineUpdate(line.id,"warehouse",e.target.value)}>
+                    <option value="">{warehouseOptions.loading ? "Memuat gudang…" : "Gunakan gudang default Accurate"}</option>
+                    {line.warehouse && !warehouses.some(w=>w.name===line.warehouse) && <option value={line.warehouse} disabled>{line.warehouse} — perlu diperiksa</option>}
+                    {warehouses.map(w=><option key={w.id} value={w.name} disabled={warehouses.filter(other=>other.name===w.name).length!==1}>{w.name}</option>)}
+                  </select>
+                </Field>
                 <details className="line-details">
                   <summary>
-                    Gudang & catatan baris <ChevronDown size={14} />
+                    Informasi tambahan & catatan baris <ChevronDown size={14} />
                   </summary>
                   <div className="form-grid">
-                    <Field label="Gudang">
-                      <input
-                        value={line.warehouse}
-                        onChange={(e) =>
-                          lineUpdate(line.id, "warehouse", e.target.value)
-                        }
-                        placeholder="Nama gudang Accurate"
-                      />
-                    </Field>
                     <Field label="Dasar pajak (%)">
                       <input
                         type="number"

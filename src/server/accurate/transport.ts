@@ -6,6 +6,7 @@ export const READ_ENDPOINTS = [
   "sales-quotation/list.do", "sales-quotation/detail.do",
   "sales-order/list.do", "sales-order/detail.do",
   "item/list.do", "item/detail.do",
+  "warehouse/list.do",
   "customer/list.do", "customer/detail.do", "vendor/list.do",
 ] as const;
 export type ReadEndpoint = (typeof READ_ENDPOINTS)[number];

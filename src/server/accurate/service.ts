@@ -96,3 +96,19 @@ export async function findCustomerByNo(id: number, no: string) {
   if (!Array.isArray(response.d)) throw new AccurateReadError("UPSTREAM", "Daftar klien Accurate tidak valid.");
   return uniqueExact(response.d.map(normalizeCustomer), exact);
 }
+
+/** Fetch every page of the small warehouse master; never return a silently truncated list. */
+export async function getWarehouses(id:number):Promise<{id:number;name:string}[]> {
+  companyId(id);
+  const read=getReadTransport(),warehouses=new Map<number,{id:number;name:string}>();
+  for(let page=1;page<=50;page++) {
+    const response=await read<unknown[]>(id,"warehouse/list.do",{fields:"id,name,suspended","sp.pageSize":100,"sp.page":page,"sp.sort":"name|asc;id|asc"});
+    if(!Array.isArray(response.d))throw new AccurateReadError("UPSTREAM","Daftar gudang Accurate tidak valid.");
+    for(const value of response.d) {
+      const w=row(value);
+      if(w.suspended===false&&Number.isSafeInteger(w.id)&&Number(w.id)>0&&typeof w.name==="string"&&w.name.trim())warehouses.set(Number(w.id),{id:Number(w.id),name:w.name});
+    }
+    if(response.sp?.pageCount!==undefined?page>=response.sp.pageCount:response.d.length<100)return [...warehouses.values()];
+  }
+  throw new AccurateReadError("UPSTREAM","Daftar gudang terlalu besar untuk dimuat seluruhnya. Hubungi admin.");
+}

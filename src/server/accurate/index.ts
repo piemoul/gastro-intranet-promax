@@ -4,3 +4,5 @@ export { getConnectionStatus } from "./environment";
 export { searchItemOptions } from "./service";
 export { AccurateReadError } from "./transport";
 export type { CustomerSummary, CustomerDetail, DocumentKind, DocumentSummary, DocumentDetail, DocumentLine, ItemSummary, ItemDetail, PartnerSummary, Paged } from "./types";
+
+export { getWarehouses } from "./service";
