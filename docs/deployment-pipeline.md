@@ -16,7 +16,9 @@ Workflow `.github/workflows/ci.yml` berjalan untuk pull request, push ke `main`,
 
 Pemeriksaan database memakai service PostgreSQL 17 yang hanya hidup selama CI. `INTRANET_TEST_DATABASE_URL` diberikan pada langkah `npm test` agar kedua suite PostgreSQL berjalan pada schema terisolasi. `DATABASE_URL` tidak diberikan pada runner sehingga pengujian SQLite lokal tidak beralih ke database production.
 
-Job deployment hanya berjalan setelah seluruh pemeriksaan berhasil dan sumbernya adalah push atau pemicu manual pada `main`. Job tersebut memakai Vercel CLI versi tetap **54.0.0** untuk mengirim source aplikasi ke proyek produksi. Vercel membangun aplikasi dengan environment production miliknya.
+Job deployment hanya berjalan setelah seluruh pemeriksaan berhasil dan sumbernya adalah push atau pemicu manual pada `main`. Job tersebut memakai Vercel CLI versi tetap **54.0.0** melalui `vercel api` untuk meminta build dari commit GitHub yang persis telah diperiksa. Vercel mengambil source dari integrasi GitHub proyek dan membangun aplikasi dengan environment production miliknya. Script `scripts/deploy-verified.mjs` memeriksa identitas repository/proyek, menunggu hasil build dan pemasangan domain, lalu menggagalkan job jika deployment gagal.
+
+Token tetap dibatasi ke proyek Intranet. Perintah deployment umum CLI juga meminta metadata tim yang ditolak oleh token ini; jalur resmi `vercel api` mengakses langsung resource deployment proyek tanpa memerlukan perluasan scope token.
 
 Build CI memeriksa source tanpa kredensial layanan. Build kedua di Vercel disengaja agar kredensial Accurate, database, dan Google tidak perlu diunduh ke runner GitHub menggunakan `vercel pull`. Tidak ada panggilan Accurate mutasi dalam pengujian maupun pipeline.
 
@@ -53,4 +55,4 @@ Setelah deployment berhasil, periksa halaman login, alur Google Sign-In, pembata
 
 Jika pemeriksaan CI gagal, deployment tidak dijalankan. Perbaiki penyebab dan kirim commit baru. Jika rilis yang sudah hidup perlu dikembalikan, pilih deployment Vercel sebelumnya melalui fitur rollback atau lakukan revert commit dan biarkan pipeline menjalankan ulang semua pemeriksaan. Jangan menonaktifkan gate pengujian untuk memaksa rilis.
 
-Referensi: [GitHub Actions dengan Vercel](https://vercel.com/kb/guide/how-can-i-use-github-actions-with-vercel) dan [konfigurasi Git Vercel](https://vercel.com/docs/project-configuration/git-configuration).
+Referensi: [GitHub Actions dengan Vercel](https://vercel.com/kb/guide/how-can-i-use-github-actions-with-vercel), [Vercel API CLI](https://vercel.com/changelog/introducing-the-vercel-api-cli-command), [Create a deployment](https://vercel.com/docs/rest-api/deployments/create-a-new-deployment), dan [konfigurasi Git Vercel](https://vercel.com/docs/project-configuration/git-configuration).

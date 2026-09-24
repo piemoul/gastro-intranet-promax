@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "engines": {
-    "node": ">=24.0.0"
+    "node": "24.x"
   },
   "scripts": {
     "dev": "next dev --hostname 127.0.0.1 --port 3100",
@@ -11,7 +11,7 @@
     "start": "next start --hostname 127.0.0.1 --port 3100",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
-    "test": "NODE_OPTIONS=--conditions=react-server tsx --test tests/*.test.ts",
+    "test": "NODE_OPTIONS=--conditions=react-server tsx --test tests/*.test.ts tests/*.test.mjs",
     "research": "NODE_OPTIONS=--conditions=react-server tsx scripts/research-accurate.ts"
   },
   "dependencies": {

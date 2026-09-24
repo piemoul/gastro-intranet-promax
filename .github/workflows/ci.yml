@@ -80,4 +80,4 @@ jobs:
       - name: Install pinned deployment CLI
         run: npm install --global vercel@54.0.0
       - name: Build and deploy on Vercel
-        run: vercel deploy --prod --yes --token "$VERCEL_TOKEN" --meta githubCommitSha="$GITHUB_SHA" --meta githubCommitRef="$GITHUB_REF_NAME"
+        run: node scripts/deploy-verified.mjs

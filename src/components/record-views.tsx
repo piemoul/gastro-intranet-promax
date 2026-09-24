@@ -209,6 +209,7 @@ export function Dashboard({
         action={
           <div className="today-label">
             {new Date().toLocaleDateString("id-ID", {
+              timeZone: "Asia/Jakarta",
               weekday: "long",
               day: "numeric",
               month: "long",
