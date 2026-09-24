@@ -1,3 +1,4 @@
+import { beginPublication, finishPublication, type PublicationResult } from "./publication-state";
 import { PgDraftStore } from "./pg-store";
 import { DatabaseSync } from "node:sqlite";
 import { mkdirSync, chmodSync, existsSync, realpathSync } from "node:fs";
@@ -198,6 +199,22 @@ export class DraftStore {
       this.write(draft);
       this.appendAudit(actor,parsed.action,before,draft,reason);
       return draft;
+    });
+  }
+  reservePublication(actor:Actor,id:string,version:number):Draft {
+    return this.transaction(() => {
+      const before=this.get(actor,id);
+      this.checkVersion(before,versionSchema.parse(version));
+      const after=beginPublication(actor,before);
+      this.write(after); this.appendAudit(actor,"accurate_reserved",before,after,"");
+      return after;
+    });
+  }
+  completePublication(actor:Actor,id:string,attemptId:string,result:PublicationResult):Draft {
+    return this.transaction(() => {
+      const before=this.get(actor,id),after=finishPublication(before,attemptId,result);
+      if (after!==before) { this.write(after); this.appendAudit(actor,`accurate_${result.outcome}`,before,after,result.outcome==="published"?result.number:result.error); }
+      return after;
     });
   }
   audit(actor:Actor,id:string):AuditEntry[] {

@@ -1,6 +1,6 @@
 # Gastro Intranet
 
-Ruang kerja PO, SQ/SO, master barang, dan master klien untuk tiga PT Gastro. Tampilan mengikuti Gastro WMS. **Seluruh akses Accurate pada fase ini hanya membaca.** Tidak ada endpoint simpan/hapus Accurate maupun tombol pengaktifan mode tulis.
+Ruang kerja PO, SQ/SO, master barang, dan master klien untuk tiga PT Gastro. Tampilan mengikuti Gastro WMS. **PO/SO baru dapat dibuat di Accurate pada tahap akhir setelah persetujuan dan konfirmasi kepala bagian.** Master serta dokumen Accurate yang sudah ada tetap hanya dibaca; usulan perubahannya tetap lokal.
 
 ## Kemampuan saat ini
 
@@ -11,7 +11,7 @@ Ruang kerja PO, SQ/SO, master barang, dan master klien untuk tiga PT Gastro. Tam
 - Pencarian barang, customer, vendor, dan transaksi live di Accurate; pemisahan PT; nomor dokumen `LOCAL-...` untuk draft; audit; versi dokumen; pencegahan duplikasi saat retry.
 - Identitas asli baris Accurate, proyek, departemen, custom fields, diskon dan dasar pajak dipertahankan pada usulan yang didukung. Total formulir merupakan estimasi, belum perhitungan final Accurate.
 
-**Persetujuan internal belum menerbitkan transaksi ke Accurate.** SO Accurate tidak dapat dimundurkan, dibatalkan, atau dihapus pada tahap ini. SO lokal yang diturunkan dari SQ dapat dikembalikan menjadi draft SQ lokal dengan jejak hubungan. Dokumen sumber setelah memiliki turunan dibekukan untuk mencegah dua versi aktif.
+**Persetujuan internal belum otomatis menerbitkan transaksi ke Accurate.** Pilih **Buat SO Accurate** atau **Buat PO Accurate** pada draft yang telah disetujui. Nomor mengikuti penomoran Accurate. Dokumen yang sedang dikirim, sudah terbit, atau hasilnya belum pasti dikunci dari edit, penurunan ke SQ, dan pengiriman ulang. Hasil tidak pasti diperiksa dengan nomor Accurate; pencocokan wajib menggunakan penanda percobaan, PT, mitra, barang, dan nilai dokumen. Lihat [alur penerbitan dan batas field](docs/accurate-publication.md). SO Accurate tidak dapat dimundurkan, dibatalkan, atau dihapus pada tahap ini. SO lokal yang diturunkan dari SQ dapat dikembalikan menjadi draft SQ lokal dengan jejak hubungan. Dokumen sumber setelah memiliki turunan dibekukan untuk mencegah dua versi aktif.
 
 ## Menjalankan lokal
 

@@ -115,6 +115,7 @@ export function DraftTable({
                 <small>
                   {KIND_LABELS[d.kind]}
                   {d.source ? " · Usulan perubahan" : ""}
+                  {d.publication?.accurateNumber ? ` · Accurate: ${d.publication.accurateNumber}` : ""}
                 </small>
               </td>
               <td data-label="Pihak / nama">
@@ -366,9 +367,9 @@ export function Dashboard({
           </div>
           <div className="workspace-note">
             <span className="dot-green" />
-            <strong>Tahap hanya baca</strong>
+            <strong>Tahap akhir Accurate</strong>
             <p>
-              Persetujuan belum menerbitkan dokumen. Accurate tidak berubah.
+              Setelah persetujuan, buka draft PO/SO lalu pilih Buat Accurate.
             </p>
           </div>
         </section>
@@ -417,6 +418,7 @@ export function DocumentsView({
       (status === "all" || d.status === status) &&
       [
         d.number,
+        d.publication?.accurateNumber || "",
         d.ownerName,
         d.payload.type === "transaction"
           ? d.payload.partnerName
@@ -497,6 +499,9 @@ export function DocumentsView({
                   <option value="SUBMITTED">Menunggu persetujuan</option>
                   <option value="REVISION">Perlu revisi</option>
                   <option value="APPROVED">Disetujui internal</option>
+                  <option value="PUBLISHING">Sedang dibuat di Accurate</option>
+                  <option value="PUBLISHED">Terbit di Accurate</option>
+                  <option value="UNCERTAIN">Perlu verifikasi Accurate</option>
                 </select>
                 <ChevronDown size={14} />
               </div>
@@ -1260,6 +1265,7 @@ export function ResearchView() {
             <span>Persetujuan</span>
             <ArrowRight size={16} />
             <span>SO internal</span>
+            <ArrowRight size={16} /><span>Buat SO Accurate</span>
           </div>
           <small>
             SO yang telah ada di Accurate hanya dapat dibaca dan diusulkan
@@ -1281,9 +1287,10 @@ export function ResearchView() {
             <span>Peninjauan</span>
             <ArrowRight size={16} />
             <span>Disetujui</span>
+            <ArrowRight size={16} /><span>Buat PO Accurate</span>
           </div>
           <small>
-            Persetujuan belum mengirim PO ke Accurate pada tahap ini.
+            Setelah disetujui, kepala importer memilih Buat PO Accurate.
           </small>
         </section>
         <section className="panel guide-card">
@@ -1304,7 +1311,7 @@ export function ResearchView() {
           <div className="guide-icon">
             <ShieldCheck size={23} />
           </div>
-          <h2>Accurate hanya baca</h2>
+          <h2>Penerbitan PO dan SO</h2>
           <p>
             Data Accurate menjadi acuan transaksi. Master barang dan klien baru
             disimpan sebagai usulan lokal dengan riwayat perubahan.
@@ -1321,7 +1328,7 @@ export function ResearchView() {
           Formulir menyediakan field umum serta field tambahan untuk kebutuhan
           masing-masing PT. Pola pengisian hasil penelitian tetap perlu
           diperiksa terhadap persyaratan API dan proses bisnis sebelum
-          penerbitan Accurate diaktifkan.
+          menerbitkan PO atau SO ke Accurate.
         </p>
         <p className="fine-print">
           Pada tahap ini tidak ada fungsi penerbitan Accurate. Field usulan

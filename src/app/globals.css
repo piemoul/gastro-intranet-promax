@@ -3369,3 +3369,12 @@ img {
 .brand-model-item > svg { flex-shrink: 0; }
 .brand-model-pages { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin-top: 14px; font-size: 13px; }
 @media (max-width: 600px) { .brand-model-help { align-items: flex-start; flex-direction: column; } }
+
+.status-published { color: #047857; background: #ecfdf5; }
+.status-publishing { color: #1d4ed8; background: #eff6ff; }
+.status-uncertain { color: #92400e; background: #fffbeb; }
+.publication-panel { border-color: #c7d8ed; }
+.publication-panel > .button { width: 100%; margin-top: 10px; }
+.publication-confirm { display: grid; grid-template-columns: 110px 1fr; gap: 12px; margin: 24px 0; }
+.publication-confirm dt { color: var(--muted); }
+.publication-confirm dd { margin: 0; overflow-wrap: anywhere; }

@@ -200,6 +200,38 @@ test("authenticated API integration uses isolated databases and allowlisted read
       assert.ok(reads.every(read=>read.method==="GET"&&/\/(?:list|detail)\.do$/.test(read.path)));
     });
 
+    await context.test("final publish API requires confirmation, head access, CSRF and the approved version",async()=>{
+      const p=transaction();p.lines[0].taxPercent=0;
+      let d=await store.create(admin,{kind:"SQ",payload:p});
+      for(const action of ["submit","approve","promote","submit","approve"] as const)d=await store.transition(admin,d.id,{version:d.version,action});
+      const endpoint=`drafts/${d.id}/publish`,input={version:d.version,confirmed:true};
+      const before=reads.length;
+      assert.equal((await request("POST",endpoint,undefined,input)).status,401);
+      assert.equal((await request("POST",endpoint,tokens.master_admin,input,"https://evil.example")).status,403);
+      assert.equal((await request("POST",endpoint,tokens.sales,input)).status,403);
+      assert.equal((await request("POST",endpoint,tokens.head_importer,input)).status,403);
+      assert.equal((await request("POST",endpoint,tokens.master_admin,{...input,confirmed:false})).status,400);
+      assert.equal((await request("POST",endpoint,tokens.master_admin,{...input,companyId:2})).status,400);
+      assert.equal(reads.length,before);
+      const previous=globalThis.fetch;let writes=0,description="";
+      globalThis.fetch=async(url,init)=>{
+        if(init?.method==="POST") {
+          assert.match(String(url),/sales-order\/save.do$/);writes++;
+          const params=new URLSearchParams(String(init.body));description=params.get("description")!;
+          assert.equal(params.get("customerNo"),customer.customerNo);assert.equal(params.has("id"),false);
+          return Response.json({s:true,r:{id:81,number:"SO081"}});
+        }
+        if(String(url).includes("sales-order/detail.do?id=81"))return Response.json({s:true,d:{...order,id:81,number:"SO081",description,taxable:false,tax1Rate:0,totalAmount:200,detailItem:[{...order.detailItem[0],useTax1:false}]}});
+        return previous(url,init);
+      };
+      try {
+        const response=await request("POST",endpoint,tokens.master_admin,input);assert.equal(response.status,200);
+        const published=(await response.json()).draft as Draft;assert.equal(published.status,"PUBLISHED");assert.equal(published.publication?.accurateNumber,"SO081");assert.equal(writes,1);
+        assert.equal((await request("POST",endpoint,tokens.master_admin,{...input,version:published.version})).status,409);assert.equal(writes,1);
+        assert.equal((await request("PUT",`drafts/${d.id}`,tokens.master_admin,{version:published.version,payload:p})).status,409);
+      } finally {globalThis.fetch=previous;}
+    });
+
     await context.test("API account changes revoke old sessions immediately and logout removes access",async()=>{
       const edited=await request("PUT",`users/${otherSales.id}`,adminToken,{name:"Disabled User",role:"sales",companyIds:[1],active:false});
       assert.equal(edited.status,200);

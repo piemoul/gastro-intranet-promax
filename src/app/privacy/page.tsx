@@ -57,12 +57,13 @@ export default function PrivacyPage() {
             </p>
           </section>
           <section>
-            <h2>Accurate dalam mode hanya baca</h2>
+            <h2>Integrasi Accurate</h2>
             <p>
               Pada tahap ini, Intranet membaca data Accurate sebagai referensi.
-              Draft dan usulan perubahan disimpan di Intranet; persetujuan
-              internal tidak membuat, mengedit, atau menghapus dokumen di
-              Accurate.
+              Draft dan usulan perubahan disimpan di Intranet. Setelah persetujuan
+              internal dan konfirmasi kepala bagian, Intranet dapat membuat
+              PO atau SO baru di Accurate. Usulan master dan perubahan dokumen
+              yang sudah ada tetap disimpan secara lokal.
             </p>
             <p>
               Kredensial integrasi Accurate digunakan pada server dan tidak

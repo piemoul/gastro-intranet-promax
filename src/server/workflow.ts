@@ -40,12 +40,14 @@ export function assertCreateKind(actor:Actor,kind:DraftKind,hasSource:boolean) {
 
 export function assertEdit(actor:Actor,draft:Draft) {
   assertDraftAccess(actor,draft);
+  assertUnpublished(draft);
   if (isHeadForKind(actor,draft.kind)) return;
   if (draft.kind === "SO" || draft.ownerId !== actor.userId || !["DRAFT","REVISION"].includes(draft.status)) throw new WorkflowError("FORBIDDEN", "Draft ini hanya dapat diubah oleh kepala bagian.",403);
 }
 
 export function assertTransition(actor:Actor,draft:Draft,action:DraftAction,reason:string) {
   assertDraftAccess(actor,draft);
+  assertUnpublished(draft);
   if (action === "submit") {
     assertEdit(actor,draft);
     if (!["DRAFT","REVISION"].includes(draft.status)) throw new WorkflowError("INVALID_TRANSITION", "Hanya draft atau dokumen revisi yang dapat diajukan.",409);
@@ -56,4 +58,14 @@ export function assertTransition(actor:Actor,draft:Draft,action:DraftAction,reas
   const valid = action === "approve" ? draft.status === "SUBMITTED" : action === "revise" || action === "reopen" ? ["SUBMITTED","APPROVED"].includes(draft.status) : action === "promote" ? draft.kind === "SQ" && draft.status === "APPROVED" : action === "demote" ? draft.kind === "SO" : false;
   if (!valid) throw new WorkflowError("INVALID_TRANSITION", "Tindakan tidak sesuai dengan jenis atau status draft.",409);
   if (action === "demote" && draft.source) throw new WorkflowError("ACCURATE_READ_ONLY", "SO yang berasal dari Accurate tidak dapat dimundurkan pada tahap read-only. Accurate tidak diubah.",409);
+}
+
+export function assertUnpublished(draft:Draft) {
+  if (["PUBLISHING","PUBLISHED","UNCERTAIN"].includes(draft.status)) throw new WorkflowError("PUBLICATION_LOCKED", "Dokumen sedang dikirim atau sudah dibuat di Accurate. Perubahan dan pengiriman ulang dikunci.",409);
+}
+export function assertPublish(actor:Actor,draft:Draft) {
+  assertDraftAccess(actor,draft);
+  if (!isHeadForKind(actor,draft.kind)) throw new WorkflowError("FORBIDDEN","Hanya kepala bagian terkait atau master admin yang dapat membuat dokumen Accurate.",403);
+  if (!["PO","SO"].includes(draft.kind) || draft.source) throw new WorkflowError("PUBLICATION_KIND","Hanya PO/SO internal baru yang dapat dibuat di Accurate. Usulan perubahan dokumen Accurate tetap lokal.",409);
+  if (draft.status !== "APPROVED" || !draft.approvedBy) throw new WorkflowError("PUBLICATION_STATUS","Selesaikan persetujuan internal sebelum membuat dokumen Accurate.",409);
 }

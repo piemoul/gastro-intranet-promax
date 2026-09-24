@@ -139,6 +139,23 @@ test("PostgreSQL persistence, permissions, concurrency and rollback in an isolat
       assert.equal(Number(retry.number.split("-").at(-1)), Number(draft.number.split("-").at(-1)) + 1);
     });
 
+    await t.test("publication reservation is exclusive across connections and survives uncertain outcomes", async () => {
+      let d=await first.create(importer,{kind:"PO",payload:payload()});
+      d=await first.transition(importer,d.id,{version:d.version,action:"submit"});
+      d=await first.transition(headImporter,d.id,{version:d.version,action:"approve"});
+      const outcomes=await Promise.allSettled([first.reservePublication(headImporter,d.id,d.version),second.reservePublication(headImporter,d.id,d.version)]);
+      assert.equal(outcomes.filter(o=>o.status==="fulfilled").length,1);
+      const reserved=await second.get(headImporter,d.id);assert.equal(reserved.status,"PUBLISHING");
+      await assert.rejects(second.update(admin,d.id,{version:reserved.version,payload:payload()}),code("PUBLICATION_LOCKED"));
+      const uncertain=await first.completePublication(headImporter,d.id,reserved.publication!.attemptId,{outcome:"uncertain",error:"Fixture timeout"});
+      await assert.rejects(second.reservePublication(headImporter,d.id,uncertain.version),code("PUBLICATION_STATUS"));
+      const published=await second.completePublication(headImporter,d.id,reserved.publication!.attemptId,{outcome:"published",id:800,number:"FIXTURE-PO800"});
+      assert.equal((await first.get(headImporter,d.id)).publication?.accurateNumber,"FIXTURE-PO800");
+      await assert.rejects(first.transition(admin,d.id,{version:published.version,action:"reopen",reason:"Fixture"}),code("PUBLICATION_LOCKED"));
+      assert.equal((await first.completePublication(headImporter,d.id,reserved.publication!.attemptId,{outcome:"uncertain",error:"Late failure"})).status,"PUBLISHED");
+      assert.deepEqual((await first.audit(headImporter,d.id)).slice(0,3).map(e=>e.action),["accurate_published","accurate_uncertain","accurate_reserved"]);
+    });
+
     await t.test("a failed schema migration rolls back and is retryable", async () => {
       await assert.rejects(ensureSchema("failed-verification-v1", async transaction => {
         await transaction`CREATE TABLE intranet_failed_verification (id INTEGER)`;

@@ -112,7 +112,7 @@ export default async function Login({
           </div>
           <div className={styles.mode}>
             <span />
-            Accurate dalam mode hanya baca
+            PO dan SO Accurate melalui persetujuan
           </div>
           <Link href="/privacy" className={styles.privacy}>
             Privasi & penggunaan data

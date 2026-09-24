@@ -1,3 +1,4 @@
+import { beginPublication, finishPublication, type PublicationResult } from "./publication-state";
 import "server-only";
 import { createHash, randomUUID } from "node:crypto";
 import { z } from "zod";
@@ -217,6 +218,24 @@ export class PgDraftStore {
       await this.appendAudit(transaction, actor, parsed.action, before, draft, reason);
       return draft;
     });
+  }
+  async reservePublication(actor:Actor,id:string,version:number):Promise<Draft> {
+    assertActor(actor); await this.ready();
+    return this.sql.begin(async sql => {
+      const before=await this.getInside(sql,actor,id,true);
+      await this.checkVersion(sql,before,versionSchema.parse(version));
+      const after=beginPublication(actor,before);
+      await this.write(sql,after); await this.appendAudit(sql,actor,"accurate_reserved",before,after,"");
+      return after;
+    }) as Promise<Draft>;
+  }
+  async completePublication(actor:Actor,id:string,attemptId:string,result:PublicationResult):Promise<Draft> {
+    assertActor(actor); await this.ready();
+    return this.sql.begin(async sql => {
+      const before=await this.getInside(sql,actor,id,true),after=finishPublication(before,attemptId,result);
+      if (after!==before) { await this.write(sql,after); await this.appendAudit(sql,actor,`accurate_${result.outcome}`,before,after,result.outcome==="published"?result.number:result.error); }
+      return after;
+    }) as Promise<Draft>;
   }
   async audit(actor: Actor, id: string): Promise<AuditEntry[]> {
     await this.get(actor, id);

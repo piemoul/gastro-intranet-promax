@@ -34,6 +34,7 @@ import {
 import { estimateTransaction } from "@/lib/calculations";
 import { identityKey } from "@/lib/item-selection";
 import type { ItemSummary } from "@/server/accurate/types";
+import { PublicationPanel } from "./publication-panel";
 import { BrandModelPicker } from "./brand-model-picker";
 import {
   api,
@@ -141,11 +142,8 @@ function EditorForm({
   const isHead =
     actor.role.startsWith("head_") || String(actor.role) === "master_admin";
   const activeKind = draft?.kind || kind;
-  const canEdit =
-    !draft ||
-    isHead ||
-    ((draft.status === "DRAFT" || draft.status === "REVISION") &&
-      draft.ownerId === actor.userId);
+  const publicationLocked = !!draft && ["PUBLISHING", "PUBLISHED", "UNCERTAIN"].includes(draft.status);
+  const canEdit = !publicationLocked && (!draft || isHead || ((draft.status === "DRAFT" || draft.status === "REVISION") && draft.ownerId === actor.userId));
   const totals = payload.type === "transaction" ? safeEstimate(payload) : null;
   const change = (next: DraftPayload) => {
     setPayload(next);
@@ -180,7 +178,7 @@ function EditorForm({
       setDraft(result.draft);
       setPayload(result.draft.payload);
       setDirty(false);
-      setMessage("Draft tersimpan di Intranet. Accurate tetap hanya baca.");
+      setMessage("Draft tersimpan di Intranet. Pembuatan Accurate dilakukan pada tahap akhir.");
       void updateHistory(result.draft.id);
       onSaved(result.draft);
       return result.draft;
@@ -280,7 +278,7 @@ function EditorForm({
             <span>
               {draft?.source
                 ? `Referensi Accurate: ${draft.source.number}. Perubahan disimpan sebagai usulan di Intranet.`
-                : "Draft dan persetujuan disimpan di Intranet. Tidak dikirim ke Accurate."}
+                : "Draft dan persetujuan tersimpan di Intranet. PO/SO dikirim melalui tahap akhir Buat Accurate."}
             </span>
           </div>
           {error && (
@@ -399,10 +397,10 @@ function EditorForm({
             )}
             <div className="local-label">
               <span />
-              Tersimpan di Intranet saja
+              {draft?.status === "PUBLISHED" ? `Accurate: ${draft.publication?.accurateNumber}` : "Draft tersimpan di Intranet"}
             </div>
           </section>
-          {draft && (
+          {draft && !publicationLocked && (
             <section className="panel action-panel">
               <h2>Alur persetujuan</h2>
               <p>Semua tindakan pada tahap ini berlaku secara internal.</p>
@@ -451,6 +449,7 @@ function EditorForm({
               )}
             </section>
           )}
+          {draft && <PublicationPanel draft={draft} actor={actor} dirty={dirty || busy} onSaved={next => { setDraft(next); setPayload(next.payload); setDirty(false); void updateHistory(next.id); onSaved(next); }} />}
           {draft && (
             <section className="panel audit-panel">
               <h2>Jejak dokumen</h2>
@@ -696,11 +695,11 @@ function TransactionFields({
                 onChange={(e) => update("shipDate", e.target.value)}
               />
             </Field>
-            <Field label="Salesperson">
+            <Field label="Nomor identitas salesperson (SO)">
               <input
                 value={p.salesperson}
                 onChange={(e) => update("salesperson", e.target.value)}
-                placeholder="Nama salesperson"
+                placeholder="Nomor salesperson di Accurate"
               />
             </Field>
             <Field label="Alamat pengiriman" span>
@@ -861,7 +860,7 @@ function TransactionFields({
                         }
                       />
                     </Field>
-                    <Field label="Proyek">
+                    <Field label="Kode proyek Accurate">
                       <input
                         value={line.project || ""}
                         onChange={(e) =>
@@ -950,8 +949,8 @@ function CustomFields({
     <div className="custom-fields">
       <h3>Field tambahan perusahaan</h3>
       <p className="fine-print">
-        Isi nama field sesuai penggunaan di Accurate. Nilai ini tersimpan pada
-        usulan lokal.
+        Field tambahan tersimpan di draft. Field yang belum didukung API akan
+        ditolak sebelum penerbitan, agar tidak ada data yang hilang.
       </p>
       {Object.entries(fields).map(([key, value]) => (
         <div className="custom-field-row" key={key}>
@@ -1163,6 +1162,10 @@ export function auditLabel(action: string) {
     promote: "Draft SQ menjadi SO internal",
     demote: "Draft SO dikembalikan menjadi SQ",
     clone: "Usulan dari Accurate dibuat",
+    accurate_reserved: "Pengiriman Accurate dimulai",
+    accurate_published: "Dokumen Accurate dibuat",
+    accurate_rejected: "Accurate menolak pengiriman",
+    accurate_uncertain: "Hasil Accurate perlu diperiksa",
     CREATE: "Draft dibuat",
     UPDATE: "Draft diperbarui",
     SUBMIT: "Diajukan untuk persetujuan",

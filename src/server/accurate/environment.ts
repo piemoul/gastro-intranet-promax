@@ -1,3 +1,4 @@
+import { createOrderTransport } from "./create-transport";
 import { existsSync, readFileSync } from "node:fs";
 import { isAbsolute } from "node:path";
 import { parse } from "dotenv";
@@ -25,4 +26,10 @@ export function getConnectionStatus(): { companyId: number; configured: boolean 
 export function getReadTransport() {
   const env = readEnvironment();
   return createAccurateTransport({ host: env.ACCURATE_HOST || "https://iris.accurate.id", signatureKey: env.ACCURATE_SIGNATURE_KEY || "", tokenForCompany: id => env[TOKEN_KEYS[companyId(id)]] });
+}
+
+/** Credentials stay server-side; caller is the audited final publication service only. */
+export function getOrderCreateTransport() {
+  const env=readEnvironment();
+  return createOrderTransport({host:env.ACCURATE_HOST||"https://iris.accurate.id",signatureKey:env.ACCURATE_SIGNATURE_KEY||"",tokenForCompany:id=>env[TOKEN_KEYS[companyId(id)]]});
 }

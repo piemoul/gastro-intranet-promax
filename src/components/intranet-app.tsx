@@ -291,8 +291,8 @@ export function IntranetApp({
         <div className="sidebar-readonly">
           <ShieldCheck size={17} />
           <div>
-            <strong>Accurate · hanya baca</strong>
-            <span>Data sumber tetap aman</span>
+            <strong>Accurate · terhubung</strong>
+            <span>PO/SO setelah persetujuan</span>
           </div>
         </div>
         {profile}
@@ -316,7 +316,7 @@ export function IntranetApp({
           <div className="read-only-badge">
             <ShieldCheck size={14} />
             <span>
-              Accurate <strong>Hanya baca</strong>
+              Accurate <strong>Terhubung</strong>
             </span>
           </div>
           <div className="company-select">
