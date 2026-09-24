@@ -61,17 +61,7 @@ export function useResource<T>(url: string | null, refresh = 0) {
   }, [url, refresh]);
   return { data, error, loading };
 }
-export function dateText(value: string, withTime = false) {
-  if (!value) return "—";
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return value;
-  return date.toLocaleDateString("id-ID", {
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-    ...(withTime ? { hour: "2-digit", minute: "2-digit" } : {}),
-  });
-}
+export { formatDocumentDate as dateText } from "@/lib/date-format";
 export function Status({ status }: { status: DraftStatus }) {
   return (
     <span className={`status status-${status.toLowerCase()}`}>
