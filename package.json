@@ -2,53 +2,42 @@
   "name": "gastro-intranet",
   "version": "0.1.0",
   "private": true,
+  "engines": {
+    "node": ">=24.0.0"
+  },
   "scripts": {
-    "dev": "next dev",
+    "dev": "next dev --hostname 127.0.0.1 --port 3100",
     "build": "next build",
-    "start": "next start",
-    "lint": "eslint",
-    "test": "NODE_OPTIONS=--conditions=react-server tsx --test \"tests/**/*.test.ts\"",
-    "db:check": "tsx scripts/check-db.ts",
-    "db:generate": "drizzle-kit generate",
-    "db:migrate": "drizzle-kit migrate",
-    "db:push": "drizzle-kit push",
-    "db:studio": "drizzle-kit studio",
-    "db:seed": "tsx scripts/seed.ts",
-    "scrape:master": "tsx scripts/scrape/master.ts",
-    "scrape:quotations": "tsx scripts/scrape/quotations.ts",
-    "scrape:reconcile": "tsx scripts/scrape/reconcile.ts"
+    "start": "next start --hostname 127.0.0.1 --port 3100",
+    "lint": "eslint .",
+    "typecheck": "tsc --noEmit",
+    "test": "NODE_OPTIONS=--conditions=react-server tsx --test tests/*.test.ts",
+    "research": "NODE_OPTIONS=--conditions=react-server tsx scripts/research-accurate.ts"
   },
   "dependencies": {
-    "@neondatabase/serverless": "^1.1.0",
-    "@react-pdf/renderer": "^4.5.1",
-    "class-variance-authority": "^0.7.1",
-    "clsx": "^2.1.1",
-    "decimal.js": "^10.6.0",
-    "drizzle-orm": "^0.45.2",
+    "dotenv": "^17.4.2",
     "jose": "^6.2.3",
-    "lucide-react": "^0.548.0",
-    "next": "16.2.7",
+    "lucide-react": "^0.577.0",
+    "next": "16.3.6",
     "postgres": "^3.4.9",
     "react": "19.2.4",
     "react-dom": "19.2.4",
     "server-only": "^0.0.1",
-    "tailwind-merge": "^3.4.0",
     "zod": "^4.4.3"
   },
   "devDependencies": {
-    "@tailwindcss/postcss": "^4",
-    "@types/node": "^20",
+    "@playwright/test": "^1.58.2",
+    "@types/node": "^24",
     "@types/react": "^19",
     "@types/react-dom": "^19",
-    "cheerio": "^1.1.2",
-    "csv-parse": "^6.1.0",
-    "dotenv": "^17.4.2",
-    "drizzle-kit": "^0.31.10",
     "eslint": "^9",
-    "eslint-config-next": "16.2.7",
-    "p-limit": "^7.1.0",
-    "tailwindcss": "^4",
+    "eslint-config-next": "16.3.6",
     "tsx": "^4.22.4",
     "typescript": "^5"
+  },
+  "overrides": {
+    "postcss": "8.5.26",
+    "sharp": "0.35.4",
+    "nanoid": "3.3.18"
   }
 }

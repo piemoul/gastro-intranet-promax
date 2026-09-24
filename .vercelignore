@@ -1,0 +1,13 @@
+.git/
+.github/
+.vercel/
+node_modules/
+.next/
+.env*
+.data/
+.logs/
+graphify-out/
+test-results/
+playwright-report/
+*.tsbuildinfo
+.DS_Store

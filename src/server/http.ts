@@ -1,0 +1,7 @@
+import "server-only";
+import { ZodError } from "zod";
+import { AuthError } from "./auth/users";
+export function json(data:unknown,status=200){return Response.json(data,{status,headers:{"Cache-Control":"no-store"}});}
+export function assertSameOrigin(request:Request){const origin=request.headers.get("origin");const expected=process.env.APP_URL?new URL(process.env.APP_URL).origin:new URL(request.url).origin;if(!origin||origin!==expected)throw new AuthError("Permintaan tidak berasal dari Intranet.");if(!request.headers.get("content-type")?.includes("application/json"))throw new AuthError("Format permintaan harus JSON.",415);}
+export async function body(request:Request){assertSameOrigin(request);const text=await request.text();if(text.length>250000)throw new AuthError("Dokumen terlalu besar.",413);try{return JSON.parse(text);}catch{throw new AuthError("Data permintaan tidak valid.",400);}}
+export async function handle(fn:()=>Promise<Response>|Response){try{return await fn();}catch(error){if(error instanceof ZodError)return json({error:error.issues.map(i=>`${i.path.join(".")}: ${i.message}`).slice(0,4).join("; ")},400);if(error instanceof Error&&"status"in error&&typeof error.status==="number")return json({error:error.message},error.status>=400&&error.status<600?error.status:500);console.error("Intranet request failed",error instanceof Error?error.name:"UnknownError");return json({error:"Permintaan belum berhasil. Data Anda tetap tersimpan. Silakan coba kembali."},500);}}
