@@ -17,7 +17,7 @@ test("authenticated API integration uses isolated databases and allowlisted read
   const dir=mkdtempSync(join(tmpdir(),"intranet-api-"));
   Object.assign(process.env,{DATABASE_URL:"",INTRANET_DATA_DIR:dir,INTRANET_WMS_ENV_FILE:"",APP_URL:"http://localhost:3100",ACCURATE_HOST:"https://fixtures.accurate.id",ACCURATE_SIGNATURE_KEY:"local-fixture-signature",ACCURATE_API_TOKEN:"fixture-company-1",ACCURATE_API_TOKEN_RSP:"fixture-company-2",ACCURATE_API_TOKEN_SARANA:"fixture-company-3"});
   const reads:{path:string;method:string;company:number}[]=[];
-  const item={id:32,no:"SKU-32",name:"Fixture Refrigerator",itemType:"INVENTORY",unit1:{name:"PCS"},unit2:{name:"BOX"},ratio2:2,suspended:false,unitPrice:100};
+  const item={id:32,no:"SKU-32",name:"Fixture Refrigerator",itemBrand:{name:"Fixture Brand"},charField1:"Model 32",itemType:"INVENTORY",unit1:{name:"PCS"},unit2:{name:"BOX"},ratio2:2,suspended:false,unitPrice:100};
   const customer={id:17,customerNo:"C-017",name:"Fixture Customer",email:"customer@example.com",currency:{code:"IDR"},suspended:false};
   const order={id:80,number:"SO-080",transDate:"24/09/2026",customer,currency:{code:"IDR"},rate:1,taxable:true,inclusiveTax:false,percentTaxable:100,tax1Rate:11,detailItem:[{id:90,item,itemUnit:{name:"PCS"},quantity:2,unitPrice:100,useTax1:true,itemDiscPercent:0,totalPrice:200}],totalAmount:222};
   globalThis.fetch=async(input,init)=>{
@@ -74,6 +74,18 @@ test("authenticated API integration uses isolated databases and allowlisted read
       assert.equal((await request("PUT","users/master-admin",tokens.master_admin,{},"https://evil.example")).status,403);
       assert.equal(reads.length,before);
       assert.equal((await store.list(admin)).length,0);
+    });
+
+    await context.test("brand/model picker requires login and uses the actor PT rather than query parameters",async()=>{
+      const before=reads.length;
+      assert.equal((await request("GET","accurate/item-options?search=Fixture")).status,401);
+      assert.equal(reads.length,before);
+      const response=await request("GET","accurate/item-options?search=Fixture&brand=Fixture%20Brand&model=Model%2032&companyId=3",tokens.sales);
+      assert.equal(response.status,200);
+      const result=await response.json();
+      assert.equal(result.items[0].id,32);
+      assert.deepEqual(result.models,["Model 32"]);
+      assert.equal(reads.at(-1)?.company,1);
     });
 
     await context.test("staff can own local drafts but cannot read live transaction documents or other staff drafts",async()=>{

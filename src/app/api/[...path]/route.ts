@@ -9,6 +9,7 @@ import { draftKindSchema,parseDraftPayload,draftActionSchema,versionSchema,reaso
 import { COMPANIES,type Actor } from "@/lib/domain";
 import { listDocuments,getDocument,searchItems,getItem,searchPartners,getConnectionStatus,searchCustomers,getCustomer } from "@/server/accurate";
 import { fromAccurate,validateAccurateReferences,validateSourceUnchanged } from "@/server/draft-sources";
+import { searchItemOptions } from "@/server/accurate";
 export const dynamic="force-dynamic";
 export const runtime="nodejs";
 type Context={params:Promise<{path:string[]}>};
@@ -26,6 +27,7 @@ export async function GET(request:Request,context:Context){return handle(async()
   if(route==="accurate/documents"){const kind=documentKind.parse(url.searchParams.get("kind"));assertHead(actor,kind);return json(await listDocuments(actor.companyId,kind,{search,page}));}
   if(path[0]==="accurate"&&path[1]==="documents"&&path.length===4){const kind=documentKind.parse(path[2]);assertHead(actor,kind);return json({document:await getDocument(actor.companyId,kind,idSchema.parse(path[3]))});}
   if(route==="accurate/items")return json(await searchItems(actor.companyId,search,page));
+  if(route==="accurate/item-options")return json(await searchItemOptions(actor.companyId,{search,brand:z.string().max(150).parse(url.searchParams.get("brand")||""),model:z.string().max(150).parse(url.searchParams.get("model")||""),page}));
   if(path[0]==="accurate"&&path[1]==="items"&&path.length===3)return json({item:await getItem(actor.companyId,idSchema.parse(path[2]))});
   if(route==="accurate/partners"){const kind=z.enum(["customer","vendor"]).parse(url.searchParams.get("kind"));if(actor.role!=="master_admin"&&((kind==="customer")!==["sales","head_sales"].includes(actor.role)))throw new AuthError("Akses mitra tidak sesuai peran.");return json({items:search.trim().length<2?[]:await searchPartners(actor.companyId,kind,search)});}
   if(route==="accurate/customers"){assertHead(actor,"CUSTOMER");return json(await searchCustomers(actor.companyId,search,page));}

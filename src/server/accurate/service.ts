@@ -2,6 +2,7 @@ import { getReadTransport } from "./environment";
 import { AccurateReadError, companyId, type ReadEndpoint } from "./transport";
 import { normalizeCustomer, normalizeCustomerDetail, normalizeDocument, normalizeDocumentDetail, normalizeItem, normalizeItemDetail, normalizePage, number, row, text } from "./normalize";
 import type { DocumentKind, PartnerSummary } from "./types";
+import { itemChoices } from "@/lib/item-selection";
 const MODULES = { PO: "purchase-order", SQ: "sales-quotation", SO: "sales-order" } as const;
 function documentEndpoint(kind: DocumentKind, action: "list" | "detail"): ReadEndpoint {
   if (!Object.hasOwn(MODULES, kind)) throw new AccurateReadError("INVALID_INPUT", "Jenis dokumen tidak valid.");
@@ -35,6 +36,20 @@ export async function searchItems(id: number, search: string, pageInput?: number
 export async function getItem(id: number, itemId: number) {
   companyId(id); const response = await getReadTransport()<unknown>(id, "item/detail.do", { id: positiveId(itemId) });
   return normalizeItemDetail(response.d);
+}
+/** One page of live Accurate master data, scoped to the authenticated active company. */
+export async function searchItemOptions(id: number, input: { search: string; brand: string; model: string; page?: number }) {
+  companyId(id);
+  const search = searchText(input.search), brand = searchText(input.brand), model = searchText(input.model), page = pageNumber(input.page);
+  if (search.length < 2) return { brands: [], models: [], items: [], hasMore: false };
+  const response = await getReadTransport()<unknown>(id, "item/list.do", {
+    fields: "id,no,name,itemBrand,charField1,unit1,itemType,suspended",
+    "filter.keywords.op": "CONTAIN", "filter.keywords.val": search,
+    "filter.suspended": false, "sp.page": page, "sp.pageSize": 50, "sp.sort": "name|asc;id|asc",
+  });
+  if (!Array.isArray(response.d)) throw new AccurateReadError("UPSTREAM", "Daftar barang Accurate tidak valid.");
+  const items = response.d.filter(value => row(value).suspended === false).map(normalizeItem);
+  return { ...itemChoices(items, brand, model), hasMore: response.sp?.pageCount != null ? response.sp.pageCount > page : response.d.length >= 50 };
 }
 export async function searchPartners(id: number, kind: "customer" | "vendor", search: string): Promise<PartnerSummary[]> {
   companyId(id); if (kind !== "customer" && kind !== "vendor") throw new AccurateReadError("INVALID_INPUT", "Jenis relasi tidak valid.");

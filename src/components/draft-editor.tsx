@@ -32,6 +32,9 @@ import {
   type TransactionPayload,
 } from "@/lib/domain";
 import { estimateTransaction } from "@/lib/calculations";
+import { identityKey } from "@/lib/item-selection";
+import type { ItemSummary } from "@/server/accurate/types";
+import { BrandModelPicker } from "./brand-model-picker";
 import {
   api,
   dateText,
@@ -43,7 +46,6 @@ import {
   post,
   Status,
   useResource,
-  type PickerOption,
 } from "./ui";
 
 type EditorProps = {
@@ -554,7 +556,7 @@ function TransactionFields({
         line.id === id ? { ...line, [key]: value } : line,
       ),
     );
-  const addItem = async (option: PickerOption) => {
+  const addItem = async (option: ItemSummary) => {
     setAdding(true);
     setError("");
     try {
@@ -566,9 +568,15 @@ function TransactionFields({
           unit: string;
           salesPrice: number;
           purchasePrice: number;
+          brand: string;
+          model: string;
+          active: boolean;
           taxRate?: number;
         };
       }>(`/api/accurate/items/${option.id}`);
+      if (!item.active || item.no !== option.no || identityKey(item.brand) !== identityKey(option.brand) || identityKey(item.model) !== identityKey(option.model)) {
+        throw new Error("Master barang berubah sejak dipilih. Cari kembali brand dan model di Accurate.");
+      }
       onChange({
         ...latestPayload.current,
         lines: [
@@ -716,11 +724,7 @@ function TransactionFields({
           <h2>Rincian barang</h2>
           <p>Pilih barang dari master Accurate perusahaan aktif.</p>
         </div>
-        <Picker
-          label="Tambah barang"
-          value=""
-          url="/api/accurate/items"
-          placeholder="Cari kode, nama, merek, atau model…"
+        <BrandModelPicker
           onSelect={(option) => void addItem(option)}
           disabled={adding}
         />
@@ -730,7 +734,7 @@ function TransactionFields({
           <div className="line-empty">
             <Plus size={22} />
             <strong>Belum ada barang</strong>
-            <p>Cari barang di atas untuk menambahkan baris pertama.</p>
+            <p>Pilih brand, model, lalu SKU di atas untuk menambahkan baris pertama.</p>
           </div>
         ) : (
           <div className="transaction-lines">
