@@ -145,6 +145,7 @@ function EditorForm({
   const publicationLocked = !!draft && ["PUBLISHING", "PUBLISHED", "UNCERTAIN"].includes(draft.status);
   const canEdit = !publicationLocked && (!draft || isHead || ((draft.status === "DRAFT" || draft.status === "REVISION") && draft.ownerId === actor.userId));
   const totals = payload.type === "transaction" ? safeEstimate(payload) : null;
+  const missingWarehouses = payload.type === "transaction" && payload.lines.some(line=>!line.warehouse.trim());
   const change = (next: DraftPayload) => {
     setPayload(next);
     setDirty(true);
@@ -225,7 +226,7 @@ function EditorForm({
   ) => (
     <button
       type="button"
-      disabled={busy || dirty}
+      disabled={busy || dirty || (missingWarehouses && ["submit","approve","promote"].includes(action))}
       className={`button ${primary ? "button-primary" : "button-secondary"}`}
       onClick={() => {
         if (["revise", "demote", "reopen"].includes(action)) {
@@ -292,6 +293,7 @@ function EditorForm({
             </Notice>
           )}
           {message && <Notice success>{message}</Notice>}
+          {missingWarehouses && <Notice error>Gudang wajib dipilih pada setiap baris barang sebelum dokumen diajukan, disetujui, atau dibuat di Accurate. Gunakan pilihan gudang per baris atau Terapkan ke semua.</Notice>}
           <form
             noValidate
             onSubmit={(e) => {
@@ -845,9 +847,9 @@ function TransactionFields({
                     />
                   </Field>
                 </div>
-                <Field label={kind === "PO" ? "Gudang tujuan" : "Gudang pengeluaran"} hint="Pilihan dari Accurate PT aktif. Dapat berbeda untuk setiap barang.">
-                  <select value={line.warehouse} disabled={warehouseOptions.loading || !!warehouseOptions.error} onChange={e=>lineUpdate(line.id,"warehouse",e.target.value)}>
-                    <option value="">{warehouseOptions.loading ? "Memuat gudang…" : "Gunakan gudang default Accurate"}</option>
+                <Field label={kind === "PO" ? "Gudang tujuan (wajib)" : "Gudang pengeluaran (wajib)"} hint="Wajib dipilih dari Accurate PT aktif. Dapat berbeda untuk setiap barang.">
+                  <select required aria-required="true" value={line.warehouse} disabled={warehouseOptions.loading || !!warehouseOptions.error} onChange={e=>lineUpdate(line.id,"warehouse",e.target.value)}>
+                    <option value="" disabled>{warehouseOptions.loading ? "Memuat gudang…" : "Pilih gudang (wajib)"}</option>
                     {line.warehouse && !warehouses.some(w=>w.name===line.warehouse) && <option value={line.warehouse} disabled>{line.warehouse} — perlu diperiksa</option>}
                     {warehouses.map(w=><option key={w.id} value={w.name} disabled={warehouses.filter(other=>other.name===w.name).length!==1}>{w.name}</option>)}
                   </select>

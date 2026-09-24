@@ -276,3 +276,18 @@ test("master-created drafts are assigned to the matching business team for heads
     assert.equal(store.get(actor("head_importer","head","importer"),purchase.id).id,purchase.id);
   }finally{store.close();}
 });
+
+test("warehouse is mandatory on every line before submission; incomplete drafts remain editable",()=>{
+  const store=new DraftStore(":memory:");
+  try {
+    for(const kind of ["PO","SQ"] as const){
+      const staff=kind==="PO"?importer:sales, p=payload();p.lines.push({...p.lines[0],id:"missing-warehouse",warehouse:"   "});
+      const draft=store.create(staff,{kind,payload:p});
+      assert.throws(()=>store.transition(staff,draft.id,{version:draft.version,action:"submit"}),/Pilih gudang Accurate.*baris 2/);
+      assert.equal(store.get(staff,draft.id).status,"DRAFT");
+      p.lines[1].warehouse="Utama";
+      const fixed=store.update(staff,draft.id,{version:draft.version,payload:p});
+      assert.equal(store.transition(staff,draft.id,{version:fixed.version,action:"submit"}).status,"SUBMITTED");
+    }
+  } finally {store.close();}
+});

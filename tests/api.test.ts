@@ -63,7 +63,7 @@ test("authenticated API integration uses isolated databases and allowlisted read
     const workStore={isStaticGeneration:false,page:"/api/[...path]/route",route:"/api/[...path]"} as WorkStore;
     return workAsyncStorage.run(workStore,()=>workUnitAsyncStorage.run(requestStore,()=>route[method](req,{params:Promise.resolve({path:req.nextUrl.pathname.slice("/api/".length).split("/")})})));
   }
-  const transaction=():TransactionPayload=>({...emptyTransaction(),date:"2026-09-24",partnerId:17,partnerNo:"C-017",partnerName:"untrusted browser label",lines:[{id:"local-line",itemId:32,itemNo:"SKU-32",name:"Fixture Refrigerator",unit:"PCS",quantity:2,unitPrice:100,discountPercent:0,taxPercent:11,warehouse:"",notes:""}]});
+  const transaction=():TransactionPayload=>({...emptyTransaction(),date:"2026-09-24",partnerId:17,partnerNo:"C-017",partnerName:"untrusted browser label",lines:[{id:"local-line",itemId:32,itemNo:"SKU-32",name:"Fixture Refrigerator",unit:"PCS",quantity:2,unitPrice:100,discountPercent:0,taxPercent:11,warehouse:"Utama",notes:""}]});
   let ownDraft:Draft;
   try {
     await context.test("unauthenticated calls reject and CSRF checks run before mutations or network",async()=>{

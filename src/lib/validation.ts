@@ -68,6 +68,7 @@ export function validateCompletePayload(kind: DraftKind, input: unknown): DraftP
       requireText(line.itemNo,["lines",index,"itemNo"],"Kode barang diperlukan.");
       requireText(line.name,["lines",index,"name"],"Nama barang diperlukan.");
       requireText(line.unit,["lines",index,"unit"],"Satuan diperlukan.");
+      requireText(line.warehouse,["lines",index,"warehouse"],`Pilih gudang Accurate untuk barang pada baris ${index+1}.`);
       if (line.quantity <= 0) issues.push({code:"custom",path:["lines",index,"quantity"],message:"Jumlah harus lebih dari nol."});
     });
   } else if (payload.type === "item") {

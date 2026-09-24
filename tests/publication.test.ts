@@ -96,6 +96,7 @@ test("mapping preserves commercial fields, rejects unsupported data and cannot i
     const d=approved(store);const p=payload();d.payload={...p,currency:"USD",exchangeRate:15000,branch:"Main",paymentTerm:"NET30",shipDate:"2026-10-02",reference:"Supplier quote",description:"Description",discountPercent:2};
     const mapped=orderPayload(d,"marker");
     assert.equal(mapped.vendorNo,p.partnerNo);assert.equal(mapped.transDate,"25/09/2026");assert.equal(mapped.shipDate,"02/10/2026");assert.equal(mapped.rate,"15000");assert.equal(mapped["detailItem[0].unitPrice"],"100");assert.equal(mapped["detailItem[0].itemDiscPercent"],"5");assert.equal(mapped["detailItem[0].useTax2"],"false");assert.equal(mapped.cashDiscPercent,"2");assert.equal(mapped["detailItem[0].warehouseName"],"Utama");assert.equal(mapped.number,undefined);assert.equal(mapped.id,undefined);assert.match(mapped.description,/Referensi: Supplier quote/);
+    d.payload={...p,lines:[{...p.lines[0],warehouse:""}]};assert.throws(()=>orderPayload(d,"marker"),/Pilih gudang Accurate/);
     d.payload={...p,customFields:{id:"999"}};assert.throws(()=>orderPayload(d,"marker"),/Field tambahan/);
     d.payload={...p,lines:[{...p.lines[0],taxPercent:12,taxBasePercent:91.666667}]};assert.throws(()=>orderPayload(d,"marker"),/DPP/);
     d.payload={...p,lines:[{...p.lines[0],sourceLineId:44}]};assert.throws(()=>orderPayload(d,"marker"),/diterbitkan ulang/);

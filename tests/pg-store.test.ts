@@ -12,7 +12,7 @@ import { emptyTransaction, emptyItem, emptyCustomer, type Actor, type Role, type
 const databaseUrl = process.env.INTRANET_TEST_DATABASE_URL;
 const actor = (role: Role, userId = role as string, companyId: 1 | 2 = 1): Actor => ({ userId, name: userId, role, companyId, companyIds: [1, 2], teamId: role === "master_admin" ? "all" : role === "sales" || role === "head_sales" ? "sales" : "importer" });
 const sales = actor("sales"), head = actor("head_sales"), importer = actor("importer"), headImporter = actor("head_importer"), admin = actor("master_admin");
-function payload(): TransactionPayload { return { ...emptyTransaction(), date: "2026-09-24", partnerId: 17, partnerNo: "C-17", partnerName: "Verification fixture", lines: [{ id: "line-one", itemId: 32, itemNo: "I-32", name: "Fixture item", unit: "PCS", quantity: 2, unitPrice: 100, discountPercent: 0, taxPercent: 12, taxBasePercent: 91.666667, warehouse: "", notes: "" }] }; }
+function payload(): TransactionPayload { return { ...emptyTransaction(), date: "2026-09-24", partnerId: 17, partnerNo: "C-17", partnerName: "Verification fixture", lines: [{ id: "line-one", itemId: 32, itemNo: "I-32", name: "Fixture item", unit: "PCS", quantity: 2, unitPrice: 100, discountPercent: 0, taxPercent: 12, taxBasePercent: 91.666667, warehouse: "Utama", notes: "" }] }; }
 const code = (expected: string) => (error: unknown) => error instanceof WorkflowError && error.code === expected;
 
 function scopedSql(url: string, schema: string): Sql {
