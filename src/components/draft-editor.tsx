@@ -541,6 +541,7 @@ function TransactionFields({
   onChange: (p: DraftPayload) => void;
 }) {
   const [warehouseRefresh,setWarehouseRefresh]=useState(0);
+  const [bulkWarehouse,setBulkWarehouse]=useState("");
   const warehouseOptions=useResource<{items:{id:number;name:string}[]}>("/api/accurate/warehouses",warehouseRefresh);
   const warehouses=warehouseOptions.data?.items||[];
   const latestPayload = useRef(p);
@@ -734,6 +735,15 @@ function TransactionFields({
         {!warehouseOptions.loading && !warehouseOptions.error && warehouses.length===0 && <Notice>Tidak ada gudang aktif yang tersedia di Accurate PT ini.</Notice>}
         {adding && <Loading label="Mengambil rincian barang…" />}
         {error && <Notice error>{error}</Notice>}
+        {p.lines.length > 0 && <div className="bulk-warehouse">
+          <Field label="Gudang untuk semua barang" hint="Terapkan ke seluruh baris yang sudah ditambahkan. Gudang per baris tetap bisa diubah.">
+            <select value={bulkWarehouse} disabled={warehouseOptions.loading || !!warehouseOptions.error} onChange={e=>setBulkWarehouse(e.target.value)}>
+              <option value="">Pilih gudang…</option>
+              {warehouses.map(w=><option key={w.id} value={w.name} disabled={warehouses.filter(other=>other.name===w.name).length!==1}>{w.name}</option>)}
+            </select>
+          </Field>
+          <button type="button" className="button button-secondary" disabled={adding || warehouseOptions.loading || !!warehouseOptions.error || warehouses.filter(w=>w.name===bulkWarehouse).length!==1} onClick={()=>update("lines",p.lines.map(line=>({...line,warehouse:bulkWarehouse})))}>Terapkan ke semua ({p.lines.length} baris)</button>
+        </div>}
         {!p.lines.length ? (
           <div className="line-empty">
             <Plus size={22} />

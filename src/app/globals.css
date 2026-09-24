@@ -3378,3 +3378,8 @@ img {
 .publication-confirm { display: grid; grid-template-columns: 110px 1fr; gap: 12px; margin: 24px 0; }
 .publication-confirm dt { color: var(--muted); }
 .publication-confirm dd { margin: 0; overflow-wrap: anywhere; }
+
+.bulk-warehouse { display: flex; align-items: flex-start; gap: 16px; padding: 18px; margin: 20px 0; border: 1px solid #dce5f0; border-radius: 12px; background: #f8faff; }
+.bulk-warehouse > .field { flex: 1; margin: 0; }
+.bulk-warehouse > .button { margin-top: 25px; flex-shrink: 0; }
+@media (max-width: 640px) { .bulk-warehouse { flex-direction: column; } .bulk-warehouse > .field, .bulk-warehouse > .button { width: 100%; } .bulk-warehouse > .button { margin-top: 0; } }
