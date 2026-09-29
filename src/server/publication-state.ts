@@ -15,5 +15,5 @@ export function finishPublication(before:Draft,attemptId:string,result:Publicati
   if (before.status==="PUBLISHED") return before; // A late timeout must never overwrite verified success.
   if (!["PUBLISHING","UNCERTAIN"].includes(before.status)) throw new WorkflowError("PUBLICATION_CONFLICT","Publikasi telah selesai.",409);
   if (result.outcome==="published" && (!Number.isSafeInteger(result.id)||result.id<=0||!result.number.trim())) throw new WorkflowError("PUBLICATION_RESULT","Identitas dokumen Accurate tidak valid.",409);
-  return {...before,status:result.outcome==="published"?"PUBLISHED":result.outcome==="rejected"?"APPROVED":"UNCERTAIN",version:before.version+1,updatedAt:new Date().toISOString(),publication:{...before.publication,...(result.outcome==="published"?{accurateId:result.id,accurateNumber:result.number,error:undefined}:{error:result.error})}};
+  return {...before,status:result.outcome==="published"?"PUBLISHED":result.outcome==="rejected"?(before.kind==="SQ"?"DRAFT":"APPROVED"):"UNCERTAIN",version:before.version+1,updatedAt:new Date().toISOString(),publication:{...before.publication,...(result.outcome==="published"?{accurateId:result.id,accurateNumber:result.number,error:undefined}:{error:result.error})}};
 }

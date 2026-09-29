@@ -9,7 +9,7 @@ import type { Actor, AuditEntry, Draft, DraftAction, DraftKind, DraftPayload, Ac
 import { COMPANIES } from "../lib/domain";
 import { draftKindSchema, draftActionSchema, parseDraftPayload, validateCompletePayload, parseAccurateSource, reasonSchema, versionSchema } from "../lib/validation";
 import { estimateTransaction } from "../lib/calculations";
-import { assertActor, assertCreateKind, assertDraftAccess, assertEdit, assertTransition, canSeeDraft, WorkflowError } from "./workflow";
+import { assertActor, assertCreateKind, assertDraftAccess, assertEdit, assertTransition, canSeeDraft, quotationReference, WorkflowError } from "./workflow";
 
 export { WorkflowError } from "./workflow";
 export type CreateDraftInput = {kind:DraftKind; payload:DraftPayload; source?:AccurateSource|null; reason?:string; requestId?:string};
@@ -182,14 +182,16 @@ export class DraftStore {
       this.checkVersion(before,parsed.version);
       const reason = parsed.reason || "";
       assertTransition(actor,before,parsed.action,reason);
-      if (["submit","approve","promote"].includes(parsed.action)) safePayload(before.kind,before.payload,true);
+      if (["submit","approve"].includes(parsed.action)) safePayload(before.kind,before.payload,true);
       const now = new Date().toISOString();
       if (parsed.action === "promote" || parsed.action === "demote") {
         const kind = parsed.action === "promote" ? "SO" : "SQ";
+        const quotation=parsed.action==="promote"?quotationReference(before):before.quotation;
+        if(parsed.action==="promote"&&quotation&&this.db.prepare("SELECT id FROM drafts d WHERE company_id=? AND kind='SO' AND json_extract(document,'$.quotation.id')=? AND NOT EXISTS (SELECT 1 FROM drafts c WHERE c.parent_id=d.id) LIMIT 1").get(before.companyId,quotation.id))throw new WorkflowError("QUOTATION_ALREADY_SELECTED","SQ ini sudah dipilih untuk SO. Buka SO yang sudah ada.",409);
         const parent:Draft = {...before,updatedAt:now,version:before.version+1,reason};
         this.write(parent);
         this.appendAudit(actor,`${parsed.action}_source`,before,parent,reason);
-        const child:Draft = {...before,id:randomUUID(),number:this.number(before.companyId,kind),kind,status:"DRAFT",source:null,parentId:before.id,approvedBy:null,version:1,createdAt:now,updatedAt:now,reason};
+        const child:Draft = {...before,id:randomUUID(),number:this.number(before.companyId,kind),kind,status:kind==="SQ"&&quotation?"PUBLISHED":"DRAFT",quotation,publication:undefined,payload:before.payload.type==="transaction"?{...before.payload,lines:before.payload.lines.map(line=>({...line,sourceLineId:undefined}))}:before.payload,source:null,parentId:before.id,approvedBy:null,version:1,createdAt:now,updatedAt:now,reason};
         this.write(child);
         this.appendAudit(actor,parsed.action,null,child,reason);
         return child;

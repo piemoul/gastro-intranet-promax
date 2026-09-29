@@ -103,7 +103,10 @@ test("only matching heads approve; revisions require reasons and author can revi
 test("approved SQ promotion and local SO reversal preserve lineage and freeze predecessors", () => {
   const store = new DraftStore(":memory:");
   try {
-    const quotation = approved(store);
+    let quotation = approved(store);
+    assert.throws(()=>store.transition(headSales,quotation.id,{version:quotation.version,action:"promote"}),code("SQ_NOT_PUBLISHED"));
+    quotation=store.reservePublication(headSales,quotation.id,quotation.version);
+    quotation=store.completePublication(headSales,quotation.id,quotation.publication!.attemptId,{outcome:"published",id:79,number:"SQ079"});
     assert.throws(() => store.create(headSales,{kind:"SO",payload:payload()}),code("SO_REQUIRES_QUOTATION"));
     const order = store.transition(headSales,quotation.id,{version:quotation.version,action:"promote"});
     assert.equal(order.kind,"SO"); assert.equal(order.status,"DRAFT"); assert.equal(order.parentId,quotation.id);
@@ -111,14 +114,14 @@ test("approved SQ promotion and local SO reversal preserve lineage and freeze pr
     const parent = store.get(headSales,quotation.id);
     assert.equal(parent.version,quotation.version+1);
     assert.throws(() => store.transition(headSales,parent.id,{version:parent.version,action:"promote"}),code("DRAFT_HAS_SUCCESSOR"));
-    assert.throws(() => store.update(headSales,parent.id,{version:parent.version,payload:payload()}),code("DRAFT_HAS_SUCCESSOR"));
+    assert.throws(() => store.update(headSales,parent.id,{version:parent.version,payload:payload()}),code("PUBLICATION_LOCKED"));
     assert.throws(() => store.update(sales,order.id,{version:1,payload:payload()}),code("FORBIDDEN"));
     assert.throws(() => store.transition(headSales,order.id,{version:1,action:"demote"}),code("REASON_REQUIRED"));
     const revision = store.transition(headSales,order.id,{version:1,action:"demote",reason:"Negosiasi ulang"});
-    assert.equal(revision.kind,"SQ"); assert.equal(revision.parentId,order.id); assert.equal(revision.status,"DRAFT");
+    assert.equal(revision.kind,"SQ"); assert.equal(revision.parentId,order.id); assert.equal(revision.status,"PUBLISHED");
     assert.equal(store.audit(headSales,order.id)[0].action,"demote_source");
     assert.equal(store.audit(headSales,quotation.id)[0].action,"promote_source");
-    assert.equal(store.auditAll(admin).length,7);
+    assert.equal(store.auditAll(admin).length,9);
   } finally { store.close(); }
 });
 
@@ -209,7 +212,7 @@ test("sourced line identities and optional commercial fields survive edits witho
     const original=payload();
     original.lines[0]={...original.lines[0],sourceLineId:700,project:"Project Seven",department:"Sales",customFields:{charField1:"Custom note"}};
     assert.throws(()=>store.create(headSales,{kind:"SQ",payload:original}),code("SOURCE_LINE_MISMATCH"));
-    const draft=store.create(headSales,{kind:"SQ",payload:original,source:{kind:"SQ",id:77,number:"SQ-77",fingerprint:"hash"}});
+    const draft=store.create(headSales,{kind:"SO",payload:original,source:{kind:"SO",id:77,number:"SQ-77",fingerprint:"hash"}});
     const replaced=structuredClone(original); replaced.lines[0].sourceLineId=701;
     assert.throws(()=>store.update(headSales,draft.id,{version:1,payload:replaced}),code("SOURCE_LINE_MISMATCH"));
     const removed=structuredClone(original); delete removed.lines[0].sourceLineId;

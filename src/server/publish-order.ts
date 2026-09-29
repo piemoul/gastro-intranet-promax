@@ -1,4 +1,5 @@
 import "server-only";
+import { validateOrderQuotation } from "./quotation";
 import type { Actor, Draft } from "../lib/domain";
 import { estimateTransaction } from "../lib/calculations";
 import { getStore } from "./store";
@@ -10,9 +11,10 @@ import { orderPayload } from "./accurate/order-payload";
 import { normalizeDocumentDetail, row } from "./accurate/normalize";
 
 type Store=ReturnType<typeof getStore>;
-const moduleFor=(draft:Draft)=>draft.kind==="PO"?"purchase-order":"sales-order";
+const moduleFor=(draft:Draft)=>draft.kind==="PO"?"purchase-order":draft.kind==="SQ"?"sales-quotation":"sales-order";
 export async function checkPublicationReferences(actor:Actor,draft:Draft) {
   await validateAccurateReferences(actor,draft.kind,draft.payload);
+  await validateOrderQuotation(actor,draft);
   if(draft.payload.type!=="transaction")return;
   const taxed=new Map(draft.payload.lines.filter(l=>l.taxPercent>0).map(l=>[l.itemId,l]));
   for(const line of taxed.values()) {
@@ -25,13 +27,13 @@ export async function checkPublicationReferences(actor:Actor,draft:Draft) {
 /** Read-back verifies identity and commercial values before recording publication success. */
 export async function verifyPublishedOrder(draft:Draft,id:number,documentNumber:string) {
   const raw=row((await getReadTransport()(draft.companyId,`${moduleFor(draft)}/detail.do`,{id})).d);
-  const doc=normalizeDocumentDetail(raw,draft.kind as "PO"|"SO",draft.companyId),p=draft.payload;
+  const doc=normalizeDocumentDetail(raw,draft.kind as "PO"|"SO"|"SQ",draft.companyId),p=draft.payload;
   const fail=()=>{throw new AccurateCreateError(true,"Dokumen ditemukan, tetapi isinya belum cocok dengan draft. Periksa dokumen Accurate sebelum melanjutkan.");};
   if(p.type!=="transaction"||!draft.publication)return fail();
-  if(doc.id!==id||doc.number!==documentNumber||!doc.header.description.split("\n").includes(draft.publication.marker)||doc.header.partnerId!==p.partnerId||doc.header.partnerNo!==p.partnerNo||doc.currency!==p.currency||doc.lines.length!==p.lines.length||doc.header.exchangeRate!==p.exchangeRate||doc.header.inclusiveTax!==p.inclusiveTax||Number(doc.header.discountPercent||0)!==p.discountPercent) return fail();
+  if(doc.id!==id||doc.number!==documentNumber||!doc.header.description.split("\n").includes(draft.publication.marker)||doc.header.partnerId!==p.partnerId||doc.header.partnerNo!==p.partnerNo||doc.currency!==p.currency||doc.lines.length!==p.lines.length||(draft.kind!=="SQ"&&doc.header.exchangeRate!==p.exchangeRate)||doc.header.inclusiveTax!==p.inclusiveTax||Number(doc.header.discountPercent||0)!==p.discountPercent) return fail();
   const expected=[...p.lines];
   for(const actual of doc.lines) {
-    const index=expected.findIndex(l=>l.itemId===actual.itemId&&l.itemNo===actual.itemNo&&l.unit===actual.unit&&l.quantity===actual.quantity&&l.unitPrice===actual.unitPrice&&(!l.warehouse||l.warehouse===actual.warehouseName)&&l.discountPercent===Number(actual.discountPercent||0));
+    const index=expected.findIndex(l=>l.itemId===actual.itemId&&l.itemNo===actual.itemNo&&l.unit===actual.unit&&l.quantity===actual.quantity&&l.unitPrice===actual.unitPrice&&(draft.kind==="SQ"||!l.warehouse||l.warehouse===actual.warehouseName)&&l.discountPercent===Number(actual.discountPercent||0));
     if(index<0)return fail();expected.splice(index,1);
   }
   const estimate=estimateTransaction(p);
@@ -49,7 +51,7 @@ export async function publishOrder(actor:Actor,id:string,version:number,dependen
   const reserved=await store.reservePublication(actor,id,version),attempt=reserved.publication!.attemptId;
   let result:{id:number;number:string};
   try {
-    result=await (dependencies.create??getOrderCreateTransport())(actor.companyId,reserved.kind as "PO"|"SO",orderPayload(reserved,reserved.publication!.marker));
+    result=await (dependencies.create??getOrderCreateTransport())(actor.companyId,reserved.kind as "PO"|"SO"|"SQ",orderPayload(reserved,reserved.publication!.marker));
   } catch(error) {
     const known=error instanceof AccurateCreateError;
     return store.completePublication(actor,id,attempt,{outcome:known&&!error.uncertain?"rejected":"uncertain",error:known?error.message:"Hasil pengiriman belum dapat dipastikan. Periksa dokumen di Accurate; pengiriman ulang dikunci."});
@@ -65,7 +67,7 @@ export async function publishOrder(actor:Actor,id:string,version:number,dependen
 export async function reconcileOrder(actor:Actor,id:string,version:number,documentNumber:string) {
   const store=getStore(),draft=await store.get(actor,id);
   assertDraftAccess(actor,draft);
-  if(!isHeadForKind(actor,draft.kind))throw new WorkflowError("FORBIDDEN","Pemeriksaan memerlukan kepala bagian terkait.",403);
+  if(!isHeadForKind(actor,draft.kind)&&!(draft.kind==="SQ"&&actor.role==="sales"&&draft.ownerId===actor.userId))throw new WorkflowError("FORBIDDEN","Pemeriksaan memerlukan kepala bagian terkait.",403);
   if(draft.version!==version||!["PUBLISHING","UNCERTAIN"].includes(draft.status)||!draft.publication)throw new WorkflowError("PUBLICATION_CONFLICT","Muat ulang status dokumen sebelum memeriksa.",409);
   const response=await getReadTransport()<unknown[]>(actor.companyId,`${moduleFor(draft)}/list.do`,{fields:"id,number","filter.number.op":"EQUAL","filter.number.val":documentNumber,"sp.pageSize":2});
   const matches=Array.isArray(response.d)?response.d.map(row).filter(r=>r.number===documentNumber&&Number.isSafeInteger(r.id)):[];

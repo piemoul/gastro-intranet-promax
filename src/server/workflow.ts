@@ -35,18 +35,24 @@ export function assertCreateKind(actor:Actor,kind:DraftKind,hasSource:boolean) {
   const allowed = isHeadForKind(actor,kind) || (actor.role === "sales" && kind === "SQ") || (actor.role === "importer" && kind === "PO");
   if (!allowed) throw new WorkflowError("FORBIDDEN", "Peran Anda tidak dapat membuat jenis draft ini.",403);
   if (hasSource && !isHeadForKind(actor,kind)) throw new WorkflowError("FORBIDDEN", "Hanya kepala bagian yang dapat menyiapkan perubahan dokumen Accurate.",403);
-  if (kind === "SO" && !hasSource) throw new WorkflowError("SO_REQUIRES_QUOTATION", "SO lokal harus berasal dari SQ yang disetujui atau referensi SO Accurate.",400);
+  if (kind === "SO" && !hasSource) throw new WorkflowError("SO_REQUIRES_QUOTATION", "SO lokal harus berasal dari SQ Accurate yang dipilih atau referensi SO Accurate.",400);
 }
 
 export function assertEdit(actor:Actor,draft:Draft) {
   assertDraftAccess(actor,draft);
   assertUnpublished(draft);
+  if(draft.kind==="SQ"&&draft.source)throw new WorkflowError("ACCURATE_READ_ONLY","SQ Accurate adalah referensi untuk SO dan tidak dapat diedit di Intranet.",409);
   if (isHeadForKind(actor,draft.kind)) return;
   if (draft.kind === "SO" || draft.ownerId !== actor.userId || !["DRAFT","REVISION"].includes(draft.status)) throw new WorkflowError("FORBIDDEN", "Draft ini hanya dapat diubah oleh kepala bagian.",403);
 }
 
 export function assertTransition(actor:Actor,draft:Draft,action:DraftAction,reason:string) {
   assertDraftAccess(actor,draft);
+  if (action === "promote") {
+    if (!isHeadForKind(actor,"SO")) throw new WorkflowError("FORBIDDEN","Hanya kepala sales atau master admin yang dapat memilih SQ untuk SO.",403);
+    if (!quotationReference(draft)) throw new WorkflowError("SQ_NOT_PUBLISHED","SQ harus tersimpan di Accurate sebelum dipilih untuk SO.",409);
+    return;
+  }
   assertUnpublished(draft);
   if (action === "submit") {
     assertEdit(actor,draft);
@@ -55,7 +61,7 @@ export function assertTransition(actor:Actor,draft:Draft,action:DraftAction,reas
   }
   if (!isHeadForKind(actor,draft.kind)) throw new WorkflowError("FORBIDDEN", "Tindakan ini memerlukan kepala bagian.",403);
   if (["revise","reopen","demote"].includes(action) && !reason) throw new WorkflowError("REASON_REQUIRED", "Berikan alasan perubahan status.",400);
-  const valid = action === "approve" ? draft.status === "SUBMITTED" : action === "revise" || action === "reopen" ? ["SUBMITTED","APPROVED"].includes(draft.status) : action === "promote" ? draft.kind === "SQ" && draft.status === "APPROVED" : action === "demote" ? draft.kind === "SO" : false;
+  const valid = action === "approve" ? draft.status === "SUBMITTED" : action === "revise" || action === "reopen" ? ["SUBMITTED","APPROVED"].includes(draft.status) : action === "demote" ? draft.kind === "SO" : false;
   if (!valid) throw new WorkflowError("INVALID_TRANSITION", "Tindakan tidak sesuai dengan jenis atau status draft.",409);
   if (action === "demote" && draft.source) throw new WorkflowError("ACCURATE_READ_ONLY", "SO yang berasal dari Accurate tidak dapat dimundurkan pada tahap read-only. Accurate tidak diubah.",409);
 }
@@ -65,7 +71,21 @@ export function assertUnpublished(draft:Draft) {
 }
 export function assertPublish(actor:Actor,draft:Draft) {
   assertDraftAccess(actor,draft);
+  if (draft.kind==="SQ" && !draft.source && !draft.quotation) {
+    if (!isHeadForKind(actor,"SQ") && !(actor.role==="sales"&&actor.userId===draft.ownerId)) throw new WorkflowError("FORBIDDEN","Hanya pemilik SQ atau kepala sales yang dapat menyimpan SQ ke Accurate.",403);
+    assertUnpublished(draft); return;
+  }
   if (!isHeadForKind(actor,draft.kind)) throw new WorkflowError("FORBIDDEN","Hanya kepala bagian terkait atau master admin yang dapat membuat dokumen Accurate.",403);
   if (!["PO","SO"].includes(draft.kind) || draft.source) throw new WorkflowError("PUBLICATION_KIND","Hanya PO/SO internal baru yang dapat dibuat di Accurate. Usulan perubahan dokumen Accurate tetap lokal.",409);
+  if (draft.kind==="SO" && !draft.quotation) throw new WorkflowError("SO_REQUIRES_QUOTATION","Pilih SQ yang sudah tersimpan di Accurate untuk membuat SO.",409);
   if (draft.status !== "APPROVED" || !draft.approvedBy) throw new WorkflowError("PUBLICATION_STATUS","Selesaikan persetujuan internal sebelum membuat dokumen Accurate.",409);
+}
+
+/** Only durable, server-issued references can establish SQ provenance. */
+export function quotationReference(draft:Draft):{id:number;number:string}|undefined {
+  if(draft.kind!=="SQ")return undefined;
+  if(draft.source?.kind==="SQ")return {id:draft.source.id,number:draft.source.number};
+  if(draft.status!=="PUBLISHED")return undefined;
+  if(draft.quotation)return draft.quotation;
+  if(draft.publication?.accurateId&&draft.publication.accurateNumber)return {id:draft.publication.accurateId,number:draft.publication.accurateNumber};
 }

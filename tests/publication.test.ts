@@ -14,6 +14,8 @@ function approved(store:DraftStore,kind:"PO"|"SO"="PO") {
   d=store.transition(admin,d.id,{version:d.version,action:"submit"});
   d=store.transition(admin,d.id,{version:d.version,action:"approve"});
   if(kind==="SO") {
+    d=store.reservePublication(admin,d.id,d.version);
+    d=store.completePublication(admin,d.id,d.publication!.attemptId,{outcome:"published",id:79,number:"SQ079"});
     d=store.transition(admin,d.id,{version:d.version,action:"promote"});
     d=store.transition(admin,d.id,{version:d.version,action:"submit"});
     d=store.transition(admin,d.id,{version:d.version,action:"approve"});
@@ -28,7 +30,7 @@ test("PO and SO publish once, freeze edits and keep Accurate identity in audit",
     const store=new DraftStore(":memory:");
     try {
       const d=approved(store,kind);let calls=0;
-      const create=async(company:number,sentKind:"PO"|"SO",params:Record<string,string>)=>{
+      const create=async(company:number,sentKind:"PO"|"SO"|"SQ",params:Record<string,string>)=>{
         calls++;assert.equal(company,1);assert.equal(sentKind,kind);assert.ok(params.description.includes("[INTRANET:"));
         const locked=store.get(admin,d.id);assert.equal(locked.status,"PUBLISHING");
         assert.throws(()=>store.update(admin,d.id,{version:locked.version,payload:payload()}),/dikunci/);
@@ -134,4 +136,37 @@ test("read-back requires the correct reservation marker, partner, item and amoun
     body.description="other draft";await assert.rejects(verifyPublishedOrder(reserved,80,"PO80"));
     body.description=reserved.publication!.marker;body.totalAmount=210;await assert.rejects(verifyPublishedOrder(reserved,80,"PO80"));
   } finally {globalThis.fetch=original;for(const key of ["ACCURATE_SIGNATURE_KEY","ACCURATE_API_TOKEN"])if(old[key]===undefined)delete process.env[key];else process.env[key]=old[key];store.close();}
+});
+
+test("sales publishes SQ without head approval; heads select it and notes stay local",async()=>{
+  const store=new DraftStore(":memory:");
+  const sales:Actor={...admin,userId:"sales",role:"sales",teamId:"sales"};
+  const headSales:Actor={...sales,userId:"head-sales",role:"head_sales"};
+  try {
+    const p=payload();p.internalNotes="PRIVATE negotiation limit";
+    const draft=store.create(sales,{kind:"SQ",payload:p});
+    assert.throws(()=>store.transition(headSales,draft.id,{version:1,action:"promote"}),{code:"SQ_NOT_PUBLISHED"});
+    let calls=0;
+    const sq=await publishOrder(sales,draft.id,1,{store,preflight,verify,create:async(_company,kind,params)=>{
+      calls++;assert.equal(kind,"SQ");
+      assert.equal(params["detailItem[0].warehouseName"],undefined);assert.equal(params.rate,undefined);
+      assert.equal(JSON.stringify(params).includes("PRIVATE"),false);
+      return{id:101,number:"SQ101"};
+    }});
+    assert.equal(calls,1);assert.equal(sq.status,"PUBLISHED");
+    assert.throws(()=>store.transition(sales,sq.id,{version:sq.version,action:"promote"}),{code:"FORBIDDEN"});
+    const so=store.transition(headSales,sq.id,{version:sq.version,action:"promote"});
+    assert.deepEqual(so.quotation,{id:101,number:"SQ101"});assert.equal(so.publication,undefined);
+    const notes={...p,internalNotes:"PRIVATE updated internal instructions"};
+    const updated=store.update(headSales,so.id,{version:so.version,payload:notes});
+    assert.deepEqual(store.get(headSales,so.id).payload,updated.payload);
+    const params=orderPayload(updated,"fixture-marker");
+    assert.equal(params["detailItem[0].salesQuotationNumber"],"SQ101");
+    assert.equal(JSON.stringify(params).includes("PRIVATE"),false);
+    assert.equal(store.audit(headSales,so.id)[0].action,"update");
+    assert.throws(()=>store.update(headSales,so.id,{version:so.version,payload:p}),{code:"VERSION_CONFLICT"});
+    const alias=store.create(headSales,{kind:"SQ",payload:p,source:{kind:"SQ",id:101,number:"SQ101",fingerprint:"fixture"}});
+    assert.throws(()=>store.transition(headSales,alias.id,{version:1,action:"promote"}),{code:"QUOTATION_ALREADY_SELECTED"});
+    assert.throws(()=>store.update(headSales,alias.id,{version:1,payload:p}),{code:"ACCURATE_READ_ONLY"});
+  }finally{store.close();}
 });

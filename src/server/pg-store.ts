@@ -7,7 +7,7 @@ import type { Actor, AuditEntry, Draft, DraftKind, DraftPayload } from "../lib/d
 import { COMPANIES } from "../lib/domain";
 import { draftKindSchema, draftActionSchema, parseDraftPayload, validateCompletePayload, parseAccurateSource, reasonSchema, versionSchema } from "../lib/validation";
 import { estimateTransaction } from "../lib/calculations";
-import { assertActor, assertCreateKind, assertDraftAccess, assertEdit, assertTransition, canSeeDraft, WorkflowError } from "./workflow";
+import { assertActor, assertCreateKind, assertDraftAccess, assertEdit, assertTransition, canSeeDraft, quotationReference, WorkflowError } from "./workflow";
 import type { CreateDraftInput, UpdateDraftInput, TransitionDraftInput } from "./store";
 import { closeSql, ensureSchema, getSql, type Sql, type TransactionSql } from "./postgres";
 
@@ -200,14 +200,20 @@ export class PgDraftStore {
       await this.checkVersion(transaction, before, parsed.version);
       const reason = parsed.reason || "";
       assertTransition(actor, before, parsed.action, reason);
-      if (["submit", "approve", "promote"].includes(parsed.action)) safePayload(before.kind, before.payload, true);
+      if (["submit", "approve"].includes(parsed.action)) safePayload(before.kind, before.payload, true);
       const now = new Date().toISOString();
       if (parsed.action === "promote" || parsed.action === "demote") {
         const kind = parsed.action === "promote" ? "SO" : "SQ";
+        const quotation=parsed.action==="promote"?quotationReference(before):before.quotation;
+        if(parsed.action==="promote"&&quotation){
+          await transaction`SELECT pg_advisory_xact_lock(hashtext(${`intranet:quotation:${before.companyId}:${quotation.id}`}))`;
+          const existing=await transaction`SELECT id FROM intranet_drafts d WHERE company_id=${before.companyId} AND kind='SO' AND document->'quotation'->>'id'=${String(quotation.id)} AND NOT EXISTS (SELECT 1 FROM intranet_drafts c WHERE c.parent_id=d.id) LIMIT 1`;
+          if(existing.length)throw new WorkflowError("QUOTATION_ALREADY_SELECTED","SQ ini sudah dipilih untuk SO. Buka SO yang sudah ada.",409);
+        }
         const parent: Draft = { ...before, updatedAt: now, version: before.version + 1, reason };
         await this.write(transaction, parent);
         await this.appendAudit(transaction, actor, `${parsed.action}_source`, before, parent, reason);
-        const child: Draft = { ...before, id: randomUUID(), number: await this.number(transaction, before.companyId, kind), kind, status: "DRAFT", source: null, parentId: before.id, approvedBy: null, version: 1, createdAt: now, updatedAt: now, reason };
+        const child: Draft = { ...before, id: randomUUID(), number: await this.number(transaction, before.companyId, kind), kind, status: kind==="SQ"&&quotation?"PUBLISHED":"DRAFT", quotation, publication: undefined, payload: before.payload.type==="transaction"?{...before.payload,lines:before.payload.lines.map(line=>({...line,sourceLineId:undefined}))}:before.payload, source: null, parentId: before.id, approvedBy: null, version: 1, createdAt: now, updatedAt: now, reason };
         await this.write(transaction, child);
         await this.appendAudit(transaction, actor, parsed.action, null, child, reason);
         return child;

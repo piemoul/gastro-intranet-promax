@@ -17,7 +17,7 @@ export const transactionLineSchema = z.object({
 }).strict();
 
 export const transactionPayloadSchema = z.object({
-  type: z.literal("transaction"), date, partnerId: z.number().int().min(0).max(Number.MAX_SAFE_INTEGER),
+  type: z.literal("transaction"), internalNotes:note.optional().default(""), date, partnerId: z.number().int().min(0).max(Number.MAX_SAFE_INTEGER),
   partnerNo: text, partnerName: text, currency: z.string().regex(/^[A-Z]{3}$/, "Gunakan kode mata uang tiga huruf."),
   exchangeRate: z.number().finite().positive().max(1_000_000_000), branch: text, paymentTerm: text,
   shipDate: date, address: note, reference: text, salesperson: text, description: note,

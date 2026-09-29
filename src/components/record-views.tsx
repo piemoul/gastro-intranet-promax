@@ -433,9 +433,9 @@ export function DocumentsView({
         title={KIND_LABELS[kind]}
         description={
           kind === "SO"
-            ? "Pantau SO dan susun usulan perubahan tanpa mengubah Accurate."
+            ? "Buat SO dari SQ Accurate terpilih dan simpan catatan internal untuk tim."
             : kind === "SQ"
-              ? "Susun penawaran pelanggan dan ajukan untuk ditinjau kepala sales."
+              ? "Simpan SQ ke Accurate. Kepala sales memilih SQ yang akan dilanjutkan menjadi SO."
               : "Susun kebutuhan pembelian dan kelola persetujuan internal."
         }
         action={
@@ -545,7 +545,7 @@ export function DocumentsView({
               <span>{filtered.length} dokumen internal</span>
               <span>
                 <ShieldCheck size={13} />
-                Belum diterbitkan ke Accurate
+                Status penerbitan tersedia pada setiap dokumen
               </span>
             </div>
           </>
@@ -963,8 +963,8 @@ function AccurateDetail({
     setActionError("");
     try {
       const { draft } = await post<{ draft: Draft }>(
-        "/api/drafts/from-accurate",
-        { kind, id, requestId: requestId.current },
+        kind === "SQ" ? "/api/drafts/select-quotation" : "/api/drafts/from-accurate",
+        { ...(kind === "SQ" ? {} : {kind}), id, requestId: requestId.current },
       );
       onClose();
       onOpen(draft.kind, draft.id);
@@ -1160,9 +1160,9 @@ function AccurateDetail({
             {editable && (
               <div className="detail-proposal">
                 <div>
-                  <strong>Perlu mengubah data ini?</strong>
+                  <strong>{kind === "SQ" ? "Lanjutkan SQ menjadi SO?" : "Perlu mengubah data ini?"}</strong>
                   <p>
-                    Susun usulan lokal untuk ditinjau. Data Accurate tetap sama.
+                    {kind === "SQ" ? "Pilih SQ ini untuk menyiapkan SO di Intranet." : "Susun usulan lokal untuk ditinjau. Data Accurate tetap sama."}
                   </p>
                 </div>
                 <button
@@ -1175,7 +1175,7 @@ function AccurateDetail({
                   ) : (
                     <Copy size={17} />
                   )}
-                  Usulkan perubahan
+                  {kind === "SQ" ? "Pilih SQ untuk SO" : "Usulkan perubahan"}
                 </button>
               </div>
             )}
@@ -1256,15 +1256,15 @@ export function ResearchView() {
           </div>
           <h2>Penjualan</h2>
           <p>
-            Sales menyusun SQ. Kepala sales meninjau, menyetujui internal, lalu
-            membuat draft SO yang terhubung.
+            Sales menyimpan SQ ke Accurate. Kepala sales memilih SQ untuk SO,
+            melengkapi catatan internal, lalu menyetujui dan membuat SO Accurate.
           </p>
           <div className="guide-flow">
             <span>SQ</span>
             <ArrowRight size={16} />
-            <span>Persetujuan</span>
+            <span>SQ Accurate</span>
             <ArrowRight size={16} />
-            <span>SO internal</span>
+            <span>Dipilih untuk SO</span>
             <ArrowRight size={16} /><span>Buat SO Accurate</span>
           </div>
           <small>

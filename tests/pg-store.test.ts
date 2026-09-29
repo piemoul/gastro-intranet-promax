@@ -78,7 +78,9 @@ test("PostgreSQL persistence, permissions, concurrency and rollback in an isolat
       const draft = await first.create(sales, { kind: "SQ", payload: payload() });
       const submitted = await first.transition(sales, draft.id, { version: 1, action: "submit" });
       await assert.rejects(first.transition(sales, draft.id, { version: 2, action: "approve" }), code("FORBIDDEN"));
-      const approved = await second.transition(head, draft.id, { version: submitted.version, action: "approve" });
+      let approved = await second.transition(head, draft.id, { version: submitted.version, action: "approve" });
+      approved=await first.reservePublication(head,approved.id,approved.version);
+      approved=await first.completePublication(head,approved.id,approved.publication!.attemptId,{outcome:"published",id:79,number:"SQ079"});
       const attempts = await Promise.allSettled([
         first.transition(head, draft.id, { version: approved.version, action: "promote" }),
         second.transition(head, draft.id, { version: approved.version, action: "promote" }),
@@ -87,7 +89,7 @@ test("PostgreSQL persistence, permissions, concurrency and rollback in an isolat
       assert.equal(attempts.filter(result => result.status === "fulfilled").length, 1);
       const order = success.value; assert.equal(order.kind, "SO"); assert.equal(order.ownerId, sales.userId); assert.equal(order.parentId, draft.id);
       const predecessor = await first.get(head, draft.id);
-      await assert.rejects(first.update(head, draft.id, { version: predecessor.version, payload: payload() }), code("DRAFT_HAS_SUCCESSOR"));
+      await assert.rejects(first.update(head, draft.id, { version: predecessor.version, payload: payload() }), code("PUBLICATION_LOCKED"));
       await assert.rejects(first.transition(head, order.id, { version: 1, action: "demote" }), code("REASON_REQUIRED"));
       const revision = await second.transition(head, order.id, { version: 1, action: "demote", reason: "Verification only" });
       assert.equal(revision.kind, "SQ"); assert.equal(revision.parentId, order.id);
@@ -101,13 +103,26 @@ test("PostgreSQL persistence, permissions, concurrency and rollback in an isolat
       assert.equal(changed.status, "DRAFT"); assert.equal(changed.approvedBy, null);
     });
 
+    await t.test("concurrent selection through two references cannot create two SO for one Accurate SQ",async()=>{
+      const source={kind:"SQ" as const,id:179,number:"SQ179",fingerprint:"fixture"};
+      const a=await first.create(head,{kind:"SQ",payload:payload(),source});
+      const b=await second.create(head,{kind:"SQ",payload:payload(),source});
+      const results=await Promise.allSettled([
+        first.transition(head,a.id,{version:1,action:"promote"}),
+        second.transition(head,b.id,{version:1,action:"promote"}),
+      ]);
+      assert.equal(results.filter(r=>r.status==="fulfilled").length,1);
+      const failure=results.find(r=>r.status==="rejected");assert.ok(failure?.status==="rejected");
+      assert.equal(failure.reason.code,"QUOTATION_ALREADY_SELECTED");
+    });
+
     await t.test("validation, source-line integrity and master proposal roles", async () => {
       const partial = await first.create(importer, { kind: "PO", payload: emptyTransaction() });
       await assert.rejects(first.transition(importer, partial.id, { version: 1, action: "submit" }), code("VALIDATION"));
       assert.equal((await first.audit(importer, partial.id)).length, 1);
       const original = payload(); original.lines[0].sourceLineId = 700; original.lines[0].project = "Fixture project"; original.lines[0].department = "Fixture department"; original.lines[0].customFields = { charField1: "Custom" };
       await assert.rejects(first.create(head, { kind: "SQ", payload: original }), code("SOURCE_LINE_MISMATCH"));
-      const sourced = await first.create(head, { kind: "SQ", payload: original, source: { kind: "SQ", id: 7, number: "Fixture-source", fingerprint: "fixture" } });
+      const sourced = await first.create(head, { kind: "SO", payload: original, source: { kind: "SO", id: 7, number: "Fixture-source", fingerprint: "fixture" } });
       const forged = structuredClone(original); forged.lines[0].sourceLineId = 701;
       await assert.rejects(first.update(head, sourced.id, { version: 1, payload: forged }), code("SOURCE_LINE_MISMATCH"));
       const saved = await first.update(head, sourced.id, { version: 1, payload: original });

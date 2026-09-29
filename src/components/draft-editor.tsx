@@ -143,7 +143,7 @@ function EditorForm({
     actor.role.startsWith("head_") || String(actor.role) === "master_admin";
   const activeKind = draft?.kind || kind;
   const publicationLocked = !!draft && ["PUBLISHING", "PUBLISHED", "UNCERTAIN"].includes(draft.status);
-  const canEdit = !publicationLocked && (!draft || isHead || ((draft.status === "DRAFT" || draft.status === "REVISION") && draft.ownerId === actor.userId));
+  const canEdit = !publicationLocked && !(draft?.kind === "SQ" && draft.source) && (!draft || isHead || ((draft.status === "DRAFT" || draft.status === "REVISION") && draft.ownerId === actor.userId));
   const totals = payload.type === "transaction" ? safeEstimate(payload) : null;
   const missingWarehouses = payload.type === "transaction" && payload.lines.some(line=>!line.warehouse.trim());
   const change = (next: DraftPayload) => {
@@ -208,7 +208,7 @@ function EditorForm({
         action === "promote"
           ? "Draft SO internal dibuat dari SQ ini. Belum diterbitkan ke Accurate."
           : action === "demote"
-            ? "Draft SQ internal dibuat dari SO ini. Accurate tidak berubah."
+            ? "Dikembalikan ke referensi SQ asal. SQ Accurate tidak dibuat ulang."
             : "Status internal berhasil diperbarui.",
       );
       void updateHistory(result.draft.id);
@@ -226,7 +226,7 @@ function EditorForm({
   ) => (
     <button
       type="button"
-      disabled={busy || dirty || (missingWarehouses && ["submit","approve","promote"].includes(action))}
+      disabled={busy || dirty || (missingWarehouses && ["submit","approve"].includes(action))}
       className={`button ${primary ? "button-primary" : "button-secondary"}`}
       onClick={() => {
         if (["revise", "demote", "reopen"].includes(action)) {
@@ -279,7 +279,7 @@ function EditorForm({
             <span>
               {draft?.source
                 ? `Referensi Accurate: ${draft.source.number}. Perubahan disimpan sebagai usulan di Intranet.`
-                : "Draft dan persetujuan tersimpan di Intranet. PO/SO dikirim melalui tahap akhir Buat Accurate."}
+                : "Simpan draft, lalu buat dokumen Accurate pada tahap akhir. SO hanya berasal dari SQ Accurate yang dipilih."}
             </span>
           </div>
           {error && (
@@ -399,10 +399,10 @@ function EditorForm({
             )}
             <div className="local-label">
               <span />
-              {draft?.status === "PUBLISHED" ? `Accurate: ${draft.publication?.accurateNumber}` : "Draft tersimpan di Intranet"}
+              {draft?.status === "PUBLISHED" ? `Accurate: ${draft.publication?.accurateNumber || draft.quotation?.number || draft.source?.number}` : "Draft tersimpan di Intranet"}
             </div>
           </section>
-          {draft && !publicationLocked && (
+          {draft && draft.kind !== "SQ" && !publicationLocked && (
             <section className="panel action-panel">
               <h2>Alur persetujuan</h2>
               <p>Semua tindakan pada tahap ini berlaku secara internal.</p>
@@ -421,10 +421,6 @@ function EditorForm({
                 {isHead &&
                   ["SUBMITTED", "APPROVED"].includes(draft.status) &&
                   actionButton("revise", "Kembalikan untuk revisi")}
-                {isHead &&
-                  draft.status === "APPROVED" &&
-                  draft.kind === "SQ" &&
-                  actionButton("promote", "Buat SO internal", true)}
                 {isHead &&
                   draft.kind === "SO" &&
                   !draft.source &&
@@ -451,6 +447,8 @@ function EditorForm({
               )}
             </section>
           )}
+          {draft?.kind === "SO" && draft.quotation && <section className="panel action-panel"><h2>Sumber SQ Accurate</h2><p>{draft.quotation.number}</p><p className="fine-print">SO ini berasal dari SQ yang dipilih kepala sales.</p></section>}
+          {draft?.kind === "SQ" && isHead && (draft.status === "PUBLISHED" || draft.source?.kind === "SQ") && <section className="panel action-panel"><h2>Pilih untuk Sales Order</h2><p>Hanya SQ yang Anda pilih akan dilanjutkan menjadi draft SO.</p>{actionButton("promote", "Pilih SQ ini → Buat SO", true)}</section>}
           {draft && <PublicationPanel draft={draft} actor={actor} dirty={dirty || busy} onSaved={next => { setDraft(next); setPayload(next.payload); setDirty(false); void updateHistory(next.id); onSaved(next); }} />}
           {draft && (
             <section className="panel audit-panel">
@@ -494,7 +492,7 @@ function EditorForm({
         >
           <p className="modal-description">
             {dialog === "demote"
-              ? "Intranet akan membuat draft SQ yang terhubung dengan SO ini. Dokumen Accurate tidak berubah."
+              ? "Intranet akan kembali ke referensi SQ asal. SQ Accurate tidak dibuat ulang. Alasan perubahan dicatat dalam riwayat."
               : "Tulis alasan agar pemilik dokumen dapat menindaklanjuti dengan jelas."}
           </p>
           <Field label="Alasan">
@@ -939,7 +937,8 @@ function TransactionFields({
             />
             <span>Harga sudah termasuk pajak</span>
           </label>
-          <Field label="Catatan" span>
+          {kind === "SO" && <Field label="Catatan internal SO" span><textarea rows={4} maxLength={5000} value={p.internalNotes || ""} onChange={e => update("internalNotes", e.target.value)} placeholder="Catatan untuk tim internal…"/><p className="field-hint">Disimpan di Intranet dan tidak dikirim ke Accurate. Klik Simpan untuk menyimpan catatan.</p></Field>}
+          <Field label="Catatan untuk Accurate" span>
             <textarea
               rows={3}
               value={p.description}

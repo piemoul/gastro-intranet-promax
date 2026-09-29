@@ -1,3 +1,4 @@
+import { validateQuotationSelection } from "@/server/quotation";
 import { publishOrder,reconcileOrder } from "@/server/publish-order";
 import { cookies } from "next/headers";
 import { z } from "zod";
@@ -42,6 +43,13 @@ export async function POST(request:Request,context:Context){return handle(async(
   if(route==="auth/logout"){const jar=await cookies(),token=jar.get(SESSION_COOKIE)?.value;if(token)await getUsers().logout(token);jar.delete(SESSION_COOKIE);return json({ok:true});}
   if(route==="session/company"){const {companyId}=z.object({companyId:z.union([z.literal(1),z.literal(2),z.literal(3)])}).strict().parse(input);return json({actor:await getUsers().changeCompany((await cookies()).get(SESSION_COOKIE)!.value,companyId)});}
   if(route==="users"){const user=publicUser(await getUsers().save(actor,input));return json({user},201);}
+  if(route==="drafts/select-quotation"){
+    assertHead(actor,"SQ");const {id,requestId}=z.object({id:idSchema,requestId:z.string().max(100)}).strict().parse(input);
+    const data=await fromAccurate(actor,"SQ",id),store=getStore();
+    const reference=await store.create(actor,{...data,requestId});
+    await validateQuotationSelection(actor,reference);await validateSourceUnchanged(actor,reference);
+    return json({draft:await store.transition(actor,reference.id,{version:reference.version,action:"promote"})},201);
+  }
   if(route==="drafts/from-accurate"){const {kind,id,requestId}=z.object({kind:z.enum(["PO","SQ","SO","ITEM","CUSTOMER"]),id:idSchema,requestId:z.string().max(100).optional()}).strict().parse(input);assertHead(actor,kind);const data=await fromAccurate(actor,kind,id);return json({draft:await getStore().create(actor,{...data,requestId})},201);}
   if(route==="drafts"){
     const {kind,payload:raw,requestId}=z.object({kind:draftKindSchema,payload:z.unknown(),requestId:z.string().max(100).optional()}).strict().parse(input);assertCreateKind(actor,kind,false);if(["ITEM_EDIT","CUSTOMER_EDIT"].includes(kind))throw new AuthError("Buka master Accurate untuk membuat usulan perubahan.",400);
@@ -49,7 +57,7 @@ export async function POST(request:Request,context:Context){return handle(async(
   }
   if(path[0]==="drafts"&&path[2]==="publish"&&path.length===3){const {version,confirmed}=z.object({version:versionSchema,confirmed:z.literal(true)}).strict().parse(input);if(confirmed)return json({draft:await publishOrder(actor,path[1],version)});}
   if(path[0]==="drafts"&&path[2]==="reconcile"&&path.length===3){const {version,number}=z.object({version:versionSchema,number:z.string().trim().min(1).max(150)}).strict().parse(input);return json({draft:await reconcileOrder(actor,path[1],version,number)});}
-  if(path[0]==="drafts"&&path[2]==="action"&&path.length===3){const data=z.object({version:versionSchema,action:draftActionSchema,reason:reasonSchema.optional()}).strict().parse(input),draft=await getStore().get(actor,path[1]);assertTransition(actor,draft,data.action,data.reason||"");if(["submit","approve","promote"].includes(data.action)){await validateAccurateReferences(actor,draft.kind,draft.payload);await validateSourceUnchanged(actor,draft);}return json({draft:await getStore().transition(actor,path[1],data)});}
+  if(path[0]==="drafts"&&path[2]==="action"&&path.length===3){const data=z.object({version:versionSchema,action:draftActionSchema,reason:reasonSchema.optional()}).strict().parse(input),draft=await getStore().get(actor,path[1]);assertTransition(actor,draft,data.action,data.reason||"");if(data.action==="promote")await validateQuotationSelection(actor,draft);if(["submit","approve","promote"].includes(data.action)){await validateAccurateReferences(actor,draft.kind,draft.payload);await validateSourceUnchanged(actor,draft);}return json({draft:await getStore().transition(actor,path[1],data)});}
   throw new AuthError("Tindakan tidak tersedia. Accurate hanya dapat dibaca.",405);
 });}
 export async function PUT(request:Request,context:Context){return handle(async()=>{

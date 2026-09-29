@@ -34,6 +34,7 @@ test("authenticated API integration uses isolated databases and allowlisted read
     else if(path==="item/detail.do")data=item;
     else if(path==="customer/detail.do")data=customer;
     else if(path==="sales-order/detail.do")data=order;
+    else if(path==="sales-quotation/detail.do")data={...order,id:Number(url.searchParams.get("id")),number:url.searchParams.get("id")==="179"?"SQ179":"SQ079",taxable:false,tax1Rate:0,totalAmount:200,detailItem:[{...order.detailItem[0],useTax1:false}]};
     else if(path==="item/list.do")data=url.searchParams.get("filter.no.val")&&url.searchParams.get("filter.no.val")!==item.no?[]:[item];
     else if(path==="customer/list.do")data=url.searchParams.get("filter.no.val")&&url.searchParams.get("filter.no.val")!==customer.customerNo?[]:[customer];
     else if(path==="sales-order/list.do")data=[order];
@@ -212,10 +213,36 @@ test("authenticated API integration uses isolated databases and allowlisted read
       assert.ok(reads.every(read=>read.method==="GET"&&/\/(?:list|detail)\.do$/.test(read.path)));
     });
 
+    await context.test("only sales heads select Accurate SQ; SO notes persist with provenance and duplicate protection",async()=>{
+      const input={id:179,requestId:"select-quotation-fixture"};
+      const before=reads.length;
+      for(const role of ["sales","importer","head_importer"])assert.equal((await request("POST","drafts/select-quotation",tokens[role],input)).status,403);
+      assert.equal(reads.length,before);
+      const response=await request("POST","drafts/select-quotation",tokens.head_sales,input);
+      assert.equal(response.status,201);
+      const selected=(await response.json()).draft as Draft;
+      assert.equal(selected.kind,"SO");assert.equal(selected.status,"DRAFT");
+      assert.deepEqual(selected.quotation,{id:179,number:"SQ179"});assert.equal(selected.source,null);
+      assert.ok(selected.payload.type==="transaction");
+      assert.equal(selected.payload.lines[0].sourceLineId,undefined);
+      const p={...selected.payload,internalNotes:"INTERNAL only: confirm installation",lines:selected.payload.lines.map(l=>({...l,warehouse:"Utama"}))};
+      const saved=await request("PUT",`drafts/${selected.id}`,tokens.head_sales,{version:1,payload:p});assert.equal(saved.status,200);
+      const reloaded=await request("GET",`drafts/${selected.id}`,tokens.head_sales);
+      const result=await reloaded.json();assert.equal(result.draft.payload.internalNotes,p.internalNotes);assert.equal(result.audit[0].action,"update");
+      assert.equal((await request("PUT",`drafts/${selected.id}`,tokens.head_sales,{version:1,payload:p})).status,409);
+      const duplicate=await request("POST","drafts/select-quotation",tokens.head_sales,{...input,requestId:"alias"});assert.equal(duplicate.status,409);
+      const {validateOrderQuotation}=await import("../src/server/quotation");
+      await validateOrderQuotation(admin,result.draft);
+      await assert.rejects(validateOrderQuotation(admin,{...result.draft,payload:{...p,partnerId:999}}));
+      await assert.rejects(validateOrderQuotation(admin,{...result.draft,payload:{...p,lines:p.lines.map(l=>({...l,quantity:999}))}}));
+    });
+
     await context.test("final publish API requires confirmation, head access, CSRF and the approved version",async()=>{
       const p=transaction();p.lines[0].taxPercent=0;p.lines[0].warehouse="Utama";
       let d=await store.create(admin,{kind:"SQ",payload:p});
-      for(const action of ["submit","approve","promote","submit","approve"] as const)d=await store.transition(admin,d.id,{version:d.version,action});
+      d=await store.reservePublication(admin,d.id,d.version);
+      d=await store.completePublication(admin,d.id,d.publication!.attemptId,{outcome:"published",id:79,number:"SQ079"});
+      for(const action of ["promote","submit","approve"] as const)d=await store.transition(admin,d.id,{version:d.version,action});
       const endpoint=`drafts/${d.id}/publish`,input={version:d.version,confirmed:true};
       const before=reads.length;
       assert.equal((await request("POST",endpoint,undefined,input)).status,401);

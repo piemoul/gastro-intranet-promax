@@ -341,7 +341,7 @@ export function IntranetApp({
       </header>
       <div className="mobile-readonly-mode">
         <ShieldCheck size={12} />
-        <span>Accurate · Hanya baca</span>
+        <span>Accurate · Terhubung</span>
         <span>Draft tersimpan di Intranet</span>
       </div>
       <main
