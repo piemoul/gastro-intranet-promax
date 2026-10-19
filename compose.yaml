@@ -1,0 +1,61 @@
+name: gastro-intranet
+
+services:
+  app:
+    image: gastro-intranet:local
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: gastro-intranet
+    restart: unless-stopped
+    init: true
+    ports:
+      - "127.0.0.1:3100:3100"
+    env_file:
+      - .env.local
+    environment:
+      DATABASE_URL: ""
+      INTRANET_TEST_DATABASE_URL: ""
+      INTRANET_DATA_DIR: /app/.data
+      INTRANET_WMS_ENV_FILE: /run/intranet/wms.env
+    volumes:
+      - intranet_data:/app/.data
+      - type: bind
+        source: ${INTRANET_WMS_ENV_FILE:-./.env.example}
+        target: /run/intranet/wms.env
+        read_only: true
+        bind:
+          create_host_path: false
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3100/login').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      start_period: 20s
+      retries: 3
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  graph:
+    image: nginx:alpine
+    container_name: gastro-intranet-graph
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:3101:80"
+    volumes:
+      - type: bind
+        source: ./.graphify/studio
+        target: /usr/share/nginx/html
+        read_only: true
+        bind:
+          create_host_path: false
+    logging:
+      driver: json-file
+      options:
+        max-size: "5m"
+        max-file: "2"
+
+volumes:
+  intranet_data:

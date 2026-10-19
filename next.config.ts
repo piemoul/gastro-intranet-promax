@@ -20,6 +20,7 @@ const privateTraceExcludes = [
 ];
 
 const config: NextConfig = {
+  output: "standalone",
   poweredByHeader: false,
   serverExternalPackages: ["node:sqlite"],
   // Keeping the root here also prevents tracing the sibling WMS checkout.

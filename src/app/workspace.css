@@ -1,0 +1,138 @@
+/* Presentation alignment with Gastro WMS / Gastro Portal. Business flows stay in their existing components. */
+.app-shell { --sidebar-width: 288px; --header-height: 64px; }
+.app-shell .sidebar { width: var(--sidebar-width); }
+.app-shell .brand { height: 80px; padding: 0 20px; }
+.app-shell .brand strong { font-size: 15px; letter-spacing: -.3px; }
+.app-shell .brand small { font-size: 10px; letter-spacing: 1px; }
+.app-shell .sidebar-scroll { min-height: 0; padding: 20px 16px; overscroll-behavior: contain; }
+.app-shell .sidebar-workspace { padding: 14px; margin-bottom: 20px; border: 0; border-radius: 16px; background: var(--brand-light); }
+.app-shell .sidebar-workspace > .eyebrow { font-size: 11px; letter-spacing: 1.1px; }
+.app-shell .workspace-name strong { font-size: 13px; line-height: 1.5; }
+.app-shell .workspace-name > div > span { font-size: 12px; }
+.app-shell .nav-group-label { padding: 0 12px; margin: 20px 0 8px; font-size: 11px; letter-spacing: 1px; }
+.app-shell .nav-link { min-height: 44px; padding: 10px 12px; gap: 12px; margin-bottom: 6px; border-radius: 12px; font-size: 14px; line-height: 1.5; }
+.app-shell .sidebar-profile { padding: 16px; gap: 12px; }
+.app-shell .sidebar-profile strong { font-size: 14px; }
+.app-shell .sidebar-profile span:not(.profile-avatar) { font-size: 12px; }
+.app-shell .sidebar-profile .icon-button { width: 44px; height: 44px; flex-shrink: 0; }
+.app-shell .sidebar-readonly { margin: 0 16px 16px; padding: 12px; }
+.app-shell .sidebar-readonly strong { font-size: 12px; }
+.app-shell .sidebar-readonly span { font-size: 11px; }
+.app-shell .topbar { left: var(--sidebar-width); height: var(--header-height); padding: 0 32px; gap: 16px; }
+.app-shell .topbar-context { flex: 1; min-width: 0; gap: 12px; }
+.app-shell .header-logo { display: none; }
+.app-shell .topbar-labels { min-width: 0; display: grid; gap: 3px; }
+.app-shell .topbar-context strong { max-width: none; font-size: 14px; font-weight: 700; line-height: 1.4; }
+.app-shell .topbar-app { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; }
+.app-shell .company-select select { min-height: 44px; max-width: 240px; font-size: 13px; }
+.app-shell .read-only-badge { font-size: 12px; }
+.app-shell .read-only-badge strong { font-size: 11px; }
+.app-shell .main-content { width: calc(100% - var(--sidebar-width)); max-width: 1600px; min-width: 0; margin-left: var(--sidebar-width); padding: 96px 32px 32px; }
+.app-shell .page-heading { gap: 16px; margin-bottom: 24px; }
+.app-shell .page-heading h1 { font-size: 24px; letter-spacing: -.6px; overflow-wrap: anywhere; }
+.app-shell .page-heading .eyebrow { font-size: 11px; }
+.app-shell .page-heading > div > p:not(.eyebrow) { font-size: 14px; line-height: 1.7; }
+.app-shell .page-footer { flex-wrap: wrap; gap: 8px 16px; font-size: 12px; }
+.app-shell .button { min-height: 44px; font-size: 13px; }
+.app-shell .icon-button { min-width: 44px; min-height: 44px; }
+.app-shell .welcome-banner p { font-size: 14px; }
+.app-shell .banner-eyebrow { font-size: 10px; }
+.app-shell .metric-label { font-size: 13px; }
+.app-shell .metric-card > p { font-size: 12px; line-height: 1.6; }
+.app-shell .panel-heading h2 { font-size: 16px; }
+.app-shell .panel-heading p { font-size: 12px; }
+.app-shell .text-button { font-size: 13px; }
+.app-shell .list-top, .app-shell .list-toolbar { padding-left: 20px; padding-right: 20px; }
+.app-shell .tabs { gap: 24px; }
+.app-shell .tabs > button { min-height: 52px; font-size: 13px; }
+.app-shell .search-field { min-width: 0; min-height: 44px; }
+.app-shell .search-field input { min-width: 0; min-height: 42px; font-size: 14px; }
+.app-shell .select-wrap select { min-height: 42px; font-size: 13px; }
+.app-shell .data-table th { padding: 12px 20px; font-size: 12px; }
+.app-shell .data-table td { padding: 16px 20px; font-size: 13px; line-height: 1.6; overflow-wrap: anywhere; }
+.app-shell .data-table td small { font-size: 12px; }
+.app-shell .data-table .document-link, .app-shell .data-table td > strong { font-size: 13px; }
+.app-shell .status { font-size: 12px; }
+.app-shell .list-foot { padding: 16px 20px; font-size: 12px; flex-wrap: wrap; }
+.app-shell .pagination { min-width: 0; padding: 16px 20px; font-size: 12px; color: #64748b; flex-wrap: wrap; gap: 12px; }
+.app-shell .pagination-controls { min-width: 0; gap: 8px; }
+.app-shell .pagination-button { min-height: 44px; padding: 10px 12px; gap: 6px; font-size: 12px; }
+.app-shell .pagination-position { min-width: 56px; text-align: center; white-space: nowrap; color: #475569; font-variant-numeric: tabular-nums; }
+.app-shell .notice { font-size: 13px; }
+.app-shell .modal-header h2 { font-size: 17px; }
+.app-shell .modal-header .icon-button { flex: none; }
+.app-shell .field { font-size: 13px; }
+.app-shell .drawer-company-picker { display: grid; gap: 8px; margin-bottom: 20px; color: #64748b; font-size: 12px; }
+.app-shell .drawer-company-picker select { width: 100%; min-height: 44px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 12px; background: white; color: var(--foreground); font-size: 14px; }
+
+@media (width < 1024px) {
+  .app-shell .sidebar { display: none; }
+  .app-shell .topbar { left: 0; height: var(--header-height); padding: 0 16px; }
+  .app-shell .header-logo { display: block; width: 64px; height: 32px; flex-shrink: 0; object-fit: contain; }
+  .app-shell .topbar-labels { border-left: 1px solid var(--line); padding-left: 12px; }
+  .app-shell .topbar-actions { gap: 0; flex-shrink: 0; }
+  .app-shell .topbar-actions > .company-select, .app-shell .read-only-badge { display: none; }
+  .app-shell .mobile-menu { display: inline-flex !important; width: 44px; height: 44px; padding: 10px; border: 1px solid var(--line); border-radius: 12px; }
+  .app-shell .main-content { width: 100%; margin-left: 0; max-width: none; padding: 88px 24px 24px; }
+  .app-shell .mobile-drawer { position: fixed; left: auto; right: 0; top: 0; bottom: 0; width: min(352px, 88vw); max-width: 100%; height: 100dvh; max-height: 100dvh; margin: 0; padding: 0; border: 0; border-left: 1px solid var(--line); background: white; color: var(--foreground); overflow: hidden; box-shadow: -12px 0 40px #19233515; }
+  .app-shell .mobile-drawer[open] { display: flex; flex-direction: column; }
+  .app-shell .mobile-drawer::backdrop { background: #171d2b59; backdrop-filter: blur(2px); }
+  .app-shell .drawer-header { display: flex; align-items: center; justify-content: space-between; flex-shrink: 0; height: 72px; padding: 0 16px; border-bottom: 1px solid var(--line); }
+  .app-shell .drawer-header strong { font-size: 15px; }
+  .app-shell .drawer-header p { margin-top: 4px; font-size: 12px; color: var(--muted); }
+  .app-shell .mobile-drawer .sidebar-scroll { padding: 20px 16px; }
+  .app-shell .mobile-drawer .sidebar-profile { padding-bottom: max(16px, env(safe-area-inset-bottom)); }
+  .app-shell .editor-aside { top: 88px; }
+  .app-shell .field input, .app-shell .field textarea, .app-shell .field select, .app-shell .search-field input { font-size: 16px; }
+}
+
+@media (max-width: 640px) {
+  .app-shell .topbar { padding: 0 12px; gap: 12px; }
+  .app-shell .topbar-context strong { font-size: 14px; max-width: none; }
+  .app-shell .topbar-app { font-size: 11px; }
+  .app-shell .main-content { padding: 88px 16px 24px; }
+  .app-shell .page-heading { gap: 16px; margin-bottom: 20px; }
+  .app-shell .page-heading h1 { font-size: 22px; }
+  .app-shell .page-heading > div > p:not(.eyebrow) { font-size: 14px; max-width: none; }
+  .app-shell .heading-action { width: 100%; }
+  .app-shell .heading-action .button { width: 100%; min-height: 44px; font-size: 13px; }
+  .app-shell .welcome-banner { min-height: 0; padding: 24px 20px; }
+  .app-shell .welcome-banner h2 { font-size: 26px; }
+  .app-shell .welcome-banner .button { min-height: 44px; font-size: 13px; }
+  .app-shell .metric-card { padding: 16px; }
+  .app-shell .metric-label { font-size: 12px; }
+  .app-shell .metric-card > p { font-size: 12px; }
+  .app-shell .list-toolbar { padding: 16px; }
+  .app-shell .list-toolbar .search-field { flex: 1 1 100%; min-width: 0; }
+  .app-shell .list-top { padding: 0 16px; }
+  .app-shell .tabs { gap: 20px; }
+  .app-shell .tabs > button { font-size: 12px; }
+  .app-shell .data-table:not(.detail-table) tr { padding: 16px; }
+  .app-shell .data-table:not(.detail-table) td { display: grid; grid-template-columns: 88px minmax(0, 1fr); gap: 4px 8px; margin-top: 10px; padding: 0; font-size: 13px; }
+  .app-shell .data-table:not(.detail-table) td:before { float: none; grid-column: 1; grid-row: 1 / span 4; width: auto; padding: 0; font-size: 12px; }
+  .app-shell .data-table:not(.detail-table) td > * { grid-column: 2; min-width: 0; }
+  .app-shell .data-table:not(.detail-table) td:first-child { display: block; padding: 0 48px 0 0; margin-top: 0; }
+  .app-shell .data-table:not(.detail-table) td:last-child:has(> button), .app-shell .data-table:not(.detail-table) td:last-child:has(> .protected-tag) { display: block; top: 10px; right: 10px; }
+  .app-shell .data-table:not(.detail-table) td:not([data-label]) { display: block; }
+  .app-shell .data-table td .document-link { font-size: 14px; }
+  .app-shell .data-table td small { font-size: 12px; }
+  .app-shell .data-table:not(.detail-table) td:nth-child(2) small { margin-left: 0; }
+  .app-shell .data-table td .status { justify-self: start; font-size: 12px; }
+  .app-shell .data-table .money { white-space: normal; }
+  .app-shell .pagination { padding: 16px; gap: 12px; }
+  .app-shell .pagination > span { width: 100%; }
+  .app-shell .pagination-controls { width: 100%; justify-content: space-between; gap: 6px; }
+  .app-shell .pagination-button { padding: 10px 8px; font-size: 12px; }
+  .app-shell .pagination-button svg { width: 14px; }
+  .app-shell .pagination-position { min-width: 48px; }
+  .app-shell .list-foot { padding: 16px; }
+  .app-shell .field, .app-shell .line-fields .field { font-size: 12px; }
+  .app-shell .editor-save > .button { min-height: 44px; font-size: 12px; }
+  .app-shell .modal { width: calc(100% - 24px); max-height: calc(100dvh - 24px); }
+  .app-shell .modal-body { padding: 16px; }
+}
+@media (max-width: 359px) {
+  .app-shell .pagination-controls { flex-wrap: wrap; }
+  .app-shell .pagination-position { order: -1; width: 100%; }
+  .app-shell .pagination-button { flex: 1; }
+}

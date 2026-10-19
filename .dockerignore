@@ -1,0 +1,15 @@
+.git
+.github
+.graphify
+.next
+node_modules
+.env*
+!.env.example
+.data
+.logs
+.vercel
+test-results
+playwright-report
+*.tsbuildinfo
+Dockerfile
+compose.yaml

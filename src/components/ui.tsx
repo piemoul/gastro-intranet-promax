@@ -182,34 +182,43 @@ export function Pagination({
   onPage: (page: number) => void;
 }) {
   return (
-    <div className="pagination">
+    <nav className="pagination" aria-label="Halaman daftar">
       <span>
         {typeof total === "number"
           ? `${total.toLocaleString("id-ID")} data`
           : `Halaman ${page}`}
       </span>
-      <div>
+      <div className="pagination-controls">
         <button
-          className="icon-button"
+          type="button"
+          className="button button-secondary pagination-button"
           aria-label="Halaman sebelumnya"
           disabled={page <= 1}
           onClick={() => onPage(page - 1)}
         >
           <ChevronLeft size={17} />
+          <span>Sebelumnya</span>
         </button>
-        <span>
+        <span
+          className="pagination-position"
+          aria-live="polite"
+          aria-atomic="true"
+          aria-label={`Halaman ${page} dari ${Math.max(pageCount, 1)}`}
+        >
           {page} / {Math.max(pageCount, 1)}
         </span>
         <button
-          className="icon-button"
+          type="button"
+          className="button button-secondary pagination-button"
           aria-label="Halaman berikutnya"
           disabled={page >= pageCount}
           onClick={() => onPage(page + 1)}
         >
+          <span>Berikutnya</span>
           <ChevronRight size={17} />
         </button>
       </div>
-    </div>
+    </nav>
   );
 }
 export function RowArrow() {

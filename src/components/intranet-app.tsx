@@ -8,7 +8,6 @@ import {
   Box,
   Building2,
   ChevronDown,
-  ChevronRight,
   ClipboardCheck,
   ClipboardList,
   FileCheck2,
@@ -177,6 +176,14 @@ export function IntranetApp({
       drawerRef.current?.close();
     }
   }, [drawer]);
+  useEffect(() => {
+    const desktop = window.matchMedia("(min-width: 1024px)");
+    const closeMobileMenu = () => {
+      if (desktop.matches) setDrawer(false);
+    };
+    desktop.addEventListener("change", closeMobileMenu);
+    return () => desktop.removeEventListener("change", closeMobileMenu);
+  }, []);
   const changeCompany = async (companyId: number) => {
     if (companyId === actor.companyId) return;
     if (
@@ -270,7 +277,7 @@ export function IntranetApp({
       <a className="skip-link" href="#main-content">
         Lewati ke konten utama
       </a>
-      <aside className="sidebar">
+      <aside className="sidebar" aria-label="Navigasi utama Gastro Intranet">
         <div className="brand">
           <Image
             src="/gastro-logo.webp"
@@ -281,10 +288,8 @@ export function IntranetApp({
           />
           <span className="brand-divider" />
           <div>
-            <strong>
-              intranet<span>.</span>
-            </strong>
-            <small>COMMERCIAL WORKSPACE</small>
+            <strong>Intranet</strong>
+            <small>GASTRO WORKSPACE</small>
           </div>
         </div>
         <div className="sidebar-scroll">{navigation}</div>
@@ -297,20 +302,20 @@ export function IntranetApp({
         </div>
         {profile}
       </aside>
-      <header className="topbar">
+      <header className="topbar" aria-label="Konteks halaman">
         <div className="topbar-context">
-          <button
-            className="icon-button mobile-menu"
-            ref={menuRef}
-            aria-label="Buka menu navigasi"
-            aria-expanded={drawer}
-            onClick={() => setDrawer(true)}
-          >
-            <Menu size={21} />
-          </button>
-          <span className="topbar-app">Intranet</span>
-          <ChevronRight size={14} className="breadcrumb-chevron" />
-          <strong>{editor ? "Draft dokumen" : activeNav.label}</strong>
+          <Image
+            className="header-logo"
+            src="/gastro-logo.webp"
+            alt="Gastro"
+            width={84}
+            height={42}
+            unoptimized
+          />
+          <div className="topbar-labels">
+            <strong>{editor ? "Draft dokumen" : activeNav.label}</strong>
+            <span className="topbar-app">{company.shortName}</span>
+          </div>
         </div>
         <div className="topbar-actions">
           <div className="read-only-badge">
@@ -337,13 +342,19 @@ export function IntranetApp({
             </select>
             <ChevronDown size={14} />
           </div>
+          <button
+            className="icon-button mobile-menu"
+            ref={menuRef}
+            aria-label="Buka menu navigasi"
+            aria-haspopup="dialog"
+            aria-controls="mobile-navigation-drawer"
+            aria-expanded={drawer}
+            onClick={() => setDrawer(true)}
+          >
+            <Menu size={21} />
+          </button>
         </div>
       </header>
-      <div className="mobile-readonly-mode">
-        <ShieldCheck size={12} />
-        <span>Accurate · Terhubung</span>
-        <span>Draft tersimpan di Intranet</span>
-      </div>
       <main
         id="main-content"
         ref={mainRef}
@@ -406,6 +417,7 @@ export function IntranetApp({
       </main>
       <dialog
         ref={drawerRef}
+        id="mobile-navigation-drawer"
         className="mobile-drawer"
         onCancel={(e) => {
           e.preventDefault();
@@ -418,9 +430,10 @@ export function IntranetApp({
         aria-label="Menu navigasi Intranet"
       >
         <div className="drawer-header">
-          <strong>
-            intranet<span>.</span>
-          </strong>
+          <div>
+            <strong>Menu Intranet</strong>
+            <p>Navigasi dan perusahaan</p>
+          </div>
           <button
             className="icon-button"
             aria-label="Tutup menu"
@@ -432,7 +445,24 @@ export function IntranetApp({
             <X size={21} />
           </button>
         </div>
-        <div className="sidebar-scroll">{navigation}</div>
+        <div className="sidebar-scroll">
+          <label className="drawer-company-picker">
+            <span>Perusahaan aktif</span>
+            <select
+              aria-label="Perusahaan aktif"
+              disabled={busy}
+              value={actor.companyId}
+              onChange={(e) => void changeCompany(Number(e.target.value))}
+            >
+              {COMPANIES.filter((c) => actor.companyIds.includes(c.id)).map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.name}
+                </option>
+              ))}
+            </select>
+          </label>
+          {navigation}
+        </div>
         {profile}
       </dialog>
     </div>

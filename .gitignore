@@ -10,3 +10,15 @@ playwright-report/
 .logs/
 .vercel/
 .vercel
+.graphify/.graphify_*
+.graphify/cache/
+.graphify/branch.json
+.graphify/worktree.json
+.graphify/needs_update
+.graphify/description-instructions/
+.graphify/label-instructions/
+.graphify/semantic-*.json
+.graphify/manifest.json
+.graphify/studio/
+.graphify/ontology/
+.graphify/2026-*/

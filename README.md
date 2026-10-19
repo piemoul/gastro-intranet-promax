@@ -1,5 +1,7 @@
 # Gastro Intranet
 
+Repository ini dilanjutkan di [piemoul/gastro-intranet-promax](https://github.com/piemoul/gastro-intranet-promax), dengan deployment Docker Desktop melalui [intranet.davay.space](https://intranet.davay.space). Source dan histori awal berasal dari `ko-indra/gastro-intranet`.
+
 Ruang kerja PO, SQ/SO, master barang, dan master klien untuk tiga PT Gastro. Tampilan mengikuti Gastro WMS. **SQ lengkap disimpan ke Accurate oleh sales atau kepala sales; hanya SQ terpilih dapat dilanjutkan menjadi SO. PO/SO baru dapat dibuat di Accurate pada tahap akhir setelah persetujuan dan konfirmasi kepala bagian.** Master serta dokumen Accurate yang sudah ada tetap hanya dibaca; usulan perubahannya tetap lokal.
 
 ## Kemampuan saat ini
@@ -23,7 +25,9 @@ cp .env.example .env.local
 npm run dev
 ```
 
-Buka `http://localhost:3100`. Isi `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `APP_URL`, dan `DATABASE_URL` di `.env.local`. Kredensial Accurate lokal dibaca dari `INTRANET_WMS_ENV_FILE`; deployment memakai environment variables Vercel. Jangan menaruh rahasia di variabel `NEXT_PUBLIC_*`.
+Buka `http://localhost:3100`. Isi `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, dan `APP_URL` di `.env.local`. Kredensial Accurate lokal dapat dibaca dari `INTRANET_WMS_ENV_FILE` atau disediakan langsung sebagai environment. `DATABASE_URL` hanya diperlukan jika memilih PostgreSQL/Neon. Jangan menaruh rahasia di variabel `NEXT_PUBLIC_*`.
+
+Untuk Docker Desktop, setelah mengisi `.env.local`, jalankan `docker compose --env-file .env.local up -d --build app`. Compose memakai SQLite dalam volume persisten. Lihat [environment, OAuth, Accurate, dan operasi Docker](docs/environment.md).
 
 Dengan `DATABASE_URL`, aplikasi memakai Neon yang sama dengan WMS tetapi **hanya tabel, trigger, fungsi, dan indeks berawalan `intranet_`**. Migrasi menambah tabel Intranet, tanpa mengubah tabel WMS. Whitelist, sesi, draft, dan audit bertahan antar-deployment. Tanpa `DATABASE_URL`, penyimpanan SQLite lokal di `.data` dipakai untuk pengembangan/pengujian; Vercel menolak konfigurasi database yang kosong.
 
@@ -46,6 +50,10 @@ Riset live Accurate dilakukan melalui `npm run research`, tetap GET-only. Sampel
 - [Matriks field dan keterbatasan](docs/accurate-field-matrix.md)
 - [Google Sign-In dan whitelist](docs/google-sign-in.md)
 - [CI/CD](docs/deployment-pipeline.md)
+- [Environment dan deployment Docker](docs/environment.md)
+- [Peta proyek dan Graphify](docs/project-map.md)
+- [Verifikasi pembacaan Accurate ketiga PT](docs/accurate-connection-check.md)
+- [Referensi dan pemeriksaan UX responsif](docs/ui-responsive-review.md)
 
 Penulisan transaksi/master ke Accurate, penanganan dokumen komersial yang ditandai tidak didukung, dan pemeriksaan dependensi WMS secara lengkap perlu tahap implementasi berikutnya. Source warning ditampilkan sebagai batasan; aplikasi tidak mengklaim dokumen siap diterbitkan hanya karena draft lokal disetujui.
 
