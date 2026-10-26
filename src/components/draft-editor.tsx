@@ -34,6 +34,8 @@ import {
 import { estimateTransaction } from "@/lib/calculations";
 import { identityKey } from "@/lib/item-selection";
 import type { ItemSummary } from "@/server/accurate/types";
+import { QuoteCommercialPanel } from "./quote-commercial-panel";
+import { CustomerPublicationPanel } from "./customer-publication-panel";
 import { PublicationPanel } from "./publication-panel";
 import { BrandModelPicker } from "./brand-model-picker";
 import { SqCatalogue, SalesEntryFields, emptySqDetails } from "./sq-catalogue";
@@ -295,6 +297,7 @@ function EditorForm({
           )}
           {message && <Notice success>{message}</Notice>}
           {missingWarehouses && <Notice error>Gudang wajib dipilih pada setiap baris barang sebelum dokumen diajukan, disetujui, atau dibuat di Accurate. Gunakan pilihan gudang per baris atau Terapkan ke semua.</Notice>}
+          {activeKind === "SQ" && payload.type === "transaction" && <QuoteCommercialPanel actor={actor} draft={draft} payload={payload} dirty={dirty||busy} onChange={change} onSaved={next=>{setDraft(next);setPayload(next.payload);setDirty(false);void updateHistory(next.id);onSaved(next);}}/>}
           <form
             noValidate
             onSubmit={(e) => {
@@ -450,6 +453,7 @@ function EditorForm({
           )}
           {draft?.kind === "SO" && draft.quotation && <section className="panel action-panel"><h2>Sumber SQ Accurate</h2><p>{draft.quotation.number}</p><p className="fine-print">SO ini berasal dari SQ yang dipilih kepala sales.</p></section>}
           {draft?.kind === "SQ" && isHead && (draft.status === "PUBLISHED" || draft.source?.kind === "SQ") && <section className="panel action-panel"><h2>Pilih untuk Sales Order</h2><p>Hanya SQ yang Anda pilih akan dilanjutkan menjadi draft SO.</p>{actionButton("promote", "Pilih SQ ini → Buat SO", true)}</section>}
+          {draft && <CustomerPublicationPanel actor={actor} draft={draft} dirty={dirty||busy} onSaved={next=>{setDraft(next);setPayload(next.payload);setDirty(false);void updateHistory(next.id);onSaved(next);}}/>}
           {draft && <PublicationPanel draft={draft} actor={actor} dirty={dirty || busy} onSaved={next => { setDraft(next); setPayload(next.payload); setDirty(false); void updateHistory(next.id); onSaved(next); }} />}
           {draft && (
             <section className="panel audit-panel">
@@ -722,7 +726,7 @@ function TransactionFields({
           />
         </details>
       </section>
-      {kind === "SQ" && <section className="panel form-panel"><h2>Review komersial SQ</h2><p>Lengkapi harga, pajak, gudang dan ketentuan sebelum diajukan kepada Super Admin.</p><div className="form-grid">{([['subject','Perihal'],['pic','PIC klien'],['validity','Masa berlaku'],['delivery','Pengiriman'],['installation','Instalasi'],['warranty','Garansi'],['franco','Franco']] as const).map(([key,label])=><Field key={key} label={label}><input value={p.sqDetails?.[key]||""} maxLength={500} onChange={e=>update("sqDetails",{...emptySqDetails(),...p.sqDetails,[key]:e.target.value})}/></Field>)}</div><label className="checkbox-field"><input type="checkbox" checked={p.sqDetails?.pricingReviewed||false} onChange={e=>update("sqDetails",{...emptySqDetails(),...p.sqDetails,pricingReviewed:e.target.checked})}/>Harga, pajak, pemetaan custom dan ketentuan telah saya periksa</label></section>}
+      {kind === "SQ" && <section className="panel form-panel"><h2>Review komersial SQ</h2><p>Lengkapi harga, pajak, gudang dan ketentuan sebelum diajukan kepada Super Admin.</p><div className="form-grid">{([['subject','Perihal'],['pic','PIC klien'],['validity','Masa berlaku'],['delivery','Pengiriman'],['installation','Instalasi'],['warranty','Garansi'],['franco','Franco'],['payment','Keterangan pembayaran']] as const).map(([key,label])=><Field key={key} label={label}><input value={p.sqDetails?.[key]||""} maxLength={500} onChange={e=>update("sqDetails",{...emptySqDetails(),...p.sqDetails,[key]:e.target.value})}/></Field>)}</div><label className="checkbox-field"><input type="checkbox" checked={p.sqDetails?.pricingReviewed||false} onChange={e=>update("sqDetails",{...emptySqDetails(),...p.sqDetails,pricingReviewed:e.target.checked})}/>Harga, pajak, pemetaan custom dan ketentuan telah saya periksa</label></section>}
       <section className="panel form-panel">
         <div className="section-number">02</div>
         <div className="form-section-title">
@@ -1269,6 +1273,7 @@ function CustomerFields({
           </Field>
         </div>
       </section>
+      <section className="panel form-panel"><h2>Profil klien & PIC</h2><div className="form-grid"><Field label="Tanggal pengakuan *"><input type="date" value={p.date||""} onChange={e=>update("date",e.target.value)}/></Field>{([['alias','Alias'],['group','Group'],['category','Kategori Accurate'],['branch','Cabang Accurate'],['city','Kota'],['province','Provinsi'],['country','Negara'],['zipCode','Kode pos'],['salesperson','Nomor salesperson Accurate']] as const).map(([key,label])=><Field key={key} label={label}><input value={p.profile?.[key]||""} onChange={e=>update("profile",{alias:"",group:"",category:"",branch:"",city:"",province:"",country:"",zipCode:"",salesperson:"",contacts:[],...p.profile,[key]:e.target.value})}/></Field>)}</div>{p.profile?.contacts.map((c,i)=><div className="custom-mapping form-grid" key={i}>{([['name','Nama PIC'],['position','Jabatan'],['email','Email PIC'],['phone','Telepon PIC']] as const).map(([key,label])=><Field key={key} label={label}><input value={c[key]} type={key==="email"?"email":"text"} onChange={e=>update("profile",{...p.profile!,contacts:p.profile!.contacts.map((x,n)=>n===i?{...x,[key]:e.target.value}:x)})}/></Field>)}<button type="button" className="button button-quiet" onClick={()=>update("profile",{...p.profile!,contacts:p.profile!.contacts.filter((_,n)=>n!==i)})}>Hapus PIC dari draft</button></div>)}<button type="button" className="button button-secondary" onClick={()=>update("profile",{alias:"",group:"",category:"",branch:"",city:"",province:"",country:"",zipCode:"",salesperson:"",...p.profile,contacts:[...(p.profile?.contacts||[]),{name:"",position:"",email:"",phone:""}]})}>Tambah PIC</button></section>
       <section className="panel form-panel">
         <div className="section-number">02</div>
         <div className="form-section-title">

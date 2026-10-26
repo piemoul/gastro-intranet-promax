@@ -1,3 +1,4 @@
+import { createCustomerTransport } from "./customer-create-transport";
 import { createOrderTransport } from "./create-transport";
 import { existsSync, readFileSync } from "node:fs";
 import { isAbsolute } from "node:path";
@@ -33,3 +34,5 @@ export function getOrderCreateTransport() {
   const env=readEnvironment();
   return createOrderTransport({host:env.ACCURATE_HOST||"https://iris.accurate.id",signatureKey:env.ACCURATE_SIGNATURE_KEY||"",tokenForCompany:id=>env[TOKEN_KEYS[companyId(id)]]});
 }
+
+export function getCustomerCreateTransport(){const env=readEnvironment();return createCustomerTransport({host:env.ACCURATE_HOST||"https://iris.accurate.id",signatureKey:env.ACCURATE_SIGNATURE_KEY||"",tokenForCompany:id=>env[TOKEN_KEYS[companyId(id)]]});}

@@ -1,4 +1,5 @@
 "use client";
+import { DashboardSkuSearch } from "./commercial-views";
 
 import { useEffect, useRef, useState } from "react";
 import {
@@ -219,6 +220,7 @@ export function Dashboard({
           </div>
         }
       />
+      <DashboardSkuSearch actor={actor}/>
       <section className="welcome-banner">
         <div>
           <span className="banner-eyebrow">
@@ -758,13 +760,13 @@ export function MasterView({
             : "Gunakan master barang Accurate sebagai acuan seluruh transaksi."
         }
         action={
-          editable && (
+          editable && (!customer || actor.role === "master_admin") && (
             <button
               className="button button-primary"
               onClick={() => onOpen(kind)}
             >
               <Plus size={18} />
-              Usulkan {customer ? "klien" : "barang"} baru
+              {customer ? "Tambah klien Accurate" : "Usulkan barang baru"}
             </button>
           )
         }

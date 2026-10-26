@@ -1,6 +1,7 @@
 "use client";
 import Image from "next/image";
 import { useEffect, useRef, useState } from "react";
+import { BrandModelPicker } from "./brand-model-picker";
 import { Box, Plus, Trash2 } from "lucide-react";
 import type { DraftPayload, TransactionLine, TransactionPayload } from "@/lib/domain";
 import type { WmsItem } from "@/server/integrations/reference-api";
@@ -20,12 +21,13 @@ export function SqCatalogue({payload:p,onChange}:{payload:TransactionPayload;onC
     setBusy(true);setError("");
     try{
       const {item}=await api<{item:{id:number;no:string;name:string;unit:string}}>(`/api/catalogue/resolve?${new URLSearchParams({code:source.code,wmsId:source.id})}`);
-      const line:TransactionLine={id:crypto.randomUUID(),itemId:item.id,itemNo:item.no,name:item.name,unit:item.unit,quantity:1,unitPrice:0,discountPercent:0,taxPercent:0,taxBasePercent:100,warehouse:"",notes:"",entrySource:{kind:"wms",wmsId:source.id,brand:source.brand,model:source.model}};
+      const line:TransactionLine={id:crypto.randomUUID(),itemId:item.id,itemNo:item.no,name:item.name,unit:item.unit,quantity:1,unitPrice:0,discountPercent:0,taxPercent:0,taxBasePercent:100,warehouse:"",notes:"",entrySource:{kind:"wms",wmsId:source.id,wmsCode:source.code,brand:source.brand,model:source.model}};
       const current=latest.current;onChange({...current,lines:[...current.lines,line],sqDetails:{...emptySqDetails(),...current.sqDetails,pricingReviewed:false}});
     }catch(e){setError((e as Error).message);}finally{setBusy(false);}
   };
   return <section className="panel form-panel sq-catalogue">
     <div className="form-section-title"><h2>Katalog barang</h2><p>Pilih barang WMS PT aktif dan jumlahnya. Harga dilengkapi saat review admin.</p></div>
+    <details className="advanced-fields"><summary>Pilih dari master SKU Accurate (termasuk yang belum ada di WMS)</summary><p className="fine-print">Barang tetap memakai ID/kode master Accurate PT aktif. Stok WMS hanya tersedia bila barang sudah memiliki padanan WMS.</p><BrandModelPicker disabled={busy} onSelect={async option=>{setBusy(true);setError("");try{const {item}=await api<{item:{id:number;no:string;name:string;unit:string;brand:string;model:string;active:boolean}}>(`/api/accurate/items/${option.id}`);if(!item.active)throw new Error("SKU Accurate tidak aktif.");const current=latest.current;onChange({...current,lines:[...current.lines,{id:crypto.randomUUID(),itemId:item.id,itemNo:item.no,name:item.name,unit:item.unit,quantity:1,unitPrice:0,discountPercent:0,taxPercent:0,taxBasePercent:100,warehouse:"",notes:"",entrySource:{kind:"accurate",brand:item.brand,model:item.model}}],sqDetails:{...emptySqDetails(),...current.sqDetails,pricingReviewed:false}});}catch(e){setError((e as Error).message);}finally{setBusy(false);}}}/></details>
     <div className="form-grid catalogue-filters">
       <label className="field field-wide">Cari SKU, nama, brand atau model<input type="search" value={search} placeholder="Cari barang seperti di katalog Gastro…" onChange={e=>setSearch(e.target.value)}/></label>
       <label className="field">Brand<select value={brand} onChange={e=>{setBrand(e.target.value);setModel("");setPage(1);}}><option value="">Semua brand</option>{!result.data&&brand&&<option>{brand}</option>}{result.data?.brands.map(b=><option key={b}>{b}</option>)}</select></label>

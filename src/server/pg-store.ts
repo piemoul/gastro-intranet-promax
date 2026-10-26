@@ -235,7 +235,13 @@ export class PgDraftStore {
     return this.sql.begin(async sql => {
       const before=await this.getInside(sql,actor,id,true);
       await this.checkVersion(sql,before,versionSchema.parse(version));
-      const after=beginPublication(actor,before);
+      if(before.kind==="CUSTOMER_CREATE"&&before.payload.type==="customer"){
+          const code=before.payload.no.toLowerCase();
+          await sql`SELECT pg_advisory_xact_lock(hashtext(${`intranet-customer:${before.companyId}:${code}`}))`;
+          const existing=await sql`SELECT id FROM intranet_drafts WHERE company_id=${before.companyId} AND kind='CUSTOMER_CREATE' AND id<>${before.id} AND lower(document->'payload'->>'no')=${code} AND document->>'status' IN ('PUBLISHING','UNCERTAIN','PUBLISHED') LIMIT 1`;
+          if(existing.length)throw new WorkflowError("CUSTOMER_RESERVED","Kode klien sudah terikat publikasi lain.",409);
+        }
+        const after=beginPublication(actor,before);
       await this.write(sql,after); await this.appendAudit(sql,actor,"accurate_reserved",before,after,"");
       return after;
     }) as Promise<Draft>;

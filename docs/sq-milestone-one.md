@@ -1,5 +1,7 @@
 # Milestone SQ pertama
 
+Perluasan 26 Oktober 2026 tersedia pada [peta fungsi komersial](intra-functional-parity-plan.md): pilihan SKU sumber di Manage Items, pemetaan WMS → Accurate, pricebook/settings, analisis/laporan/cetak, dan klien baru khusus Super Admin. Ketentuan di bawah menjelaskan milestone pertama; kode WMS berbeda kini dapat dipetakan secara eksplisit oleh Super Admin.
+
 Alur: sales memilih klien Accurate, katalog WMS dan jumlah → simpan draft → ajukan review admin → admin sales/Super Admin mengisi harga, pajak, gudang serta ketentuan → ajukan persetujuan → Super Admin menyetujui → Super Admin mengonfirmasi pembuatan SQ Accurate. Approval tidak otomatis mengirim transaksi.
 
 ## Identitas dan hak akses

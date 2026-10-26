@@ -14,7 +14,7 @@ export function assertActor(actor:Actor) {
 }
 
 export function isHeadForKind(actor:Actor, kind:DraftKind):boolean {
-  return actor.role === "master_admin" || (kind === "PO" || kind.startsWith("ITEM") ? actor.role === "head_importer" : actor.role === "head_sales");
+  return actor.role === "master_admin" || (kind !== "CUSTOMER_CREATE" && (kind === "PO" || kind.startsWith("ITEM") ? actor.role === "head_importer" : actor.role === "head_sales"));
 }
 
 export function canSeeDraft(actor:Actor, draft:Draft):boolean {
@@ -32,6 +32,7 @@ export function assertDraftAccess(actor:Actor,draft:Draft) {
 
 export function assertCreateKind(actor:Actor,kind:DraftKind,hasSource:boolean) {
   assertActor(actor);
+  if(kind==="CUSTOMER_CREATE"&&actor.role!=="master_admin")throw new WorkflowError("FORBIDDEN","Klien baru hanya dapat dibuat Super Admin.",403);
   const allowed = isHeadForKind(actor,kind) || (actor.role === "sales" && kind === "SQ") || (actor.role === "importer" && kind === "PO");
   if (!allowed) throw new WorkflowError("FORBIDDEN", "Peran Anda tidak dapat membuat jenis draft ini.",403);
   if (hasSource && !isHeadForKind(actor,kind)) throw new WorkflowError("FORBIDDEN", "Hanya kepala bagian yang dapat menyiapkan perubahan dokumen Accurate.",403);
@@ -41,6 +42,7 @@ export function assertCreateKind(actor:Actor,kind:DraftKind,hasSource:boolean) {
 export function assertEdit(actor:Actor,draft:Draft) {
   assertDraftAccess(actor,draft);
   assertUnpublished(draft);
+  if(draft.kind==="CUSTOMER_CREATE"&&actor.role!=="master_admin")throw new WorkflowError("FORBIDDEN","Draft klien baru hanya dikelola Super Admin.",403);
   if(draft.kind==="SQ"&&draft.source)throw new WorkflowError("ACCURATE_READ_ONLY","SQ Accurate adalah referensi untuk SO dan tidak dapat diedit di Intranet.",409);
   if (isHeadForKind(actor,draft.kind)) return;
   if (draft.kind === "SO" || draft.ownerId !== actor.userId || !["DRAFT","REVISION"].includes(draft.status)) throw new WorkflowError("FORBIDDEN", "Draft ini hanya dapat diubah oleh kepala bagian.",403);
@@ -73,6 +75,10 @@ export function assertUnpublished(draft:Draft) {
 }
 export function assertPublish(actor:Actor,draft:Draft) {
   assertDraftAccess(actor,draft);
+  if(draft.kind==="CUSTOMER_CREATE"){
+    if(actor.role!=="master_admin")throw new WorkflowError("FORBIDDEN","Klien Accurate hanya dapat dibuat Super Admin.",403);
+    assertUnpublished(draft);if(draft.source||draft.status!=="APPROVED"||!draft.approvedBy)throw new WorkflowError("PUBLICATION_STATUS","Setujui draft klien sebelum publikasi.",409);return;
+  }
   if (draft.kind==="SQ" && !draft.source && !draft.quotation) {
     if (actor.role!=="master_admin") throw new WorkflowError("FORBIDDEN","Hanya Super Admin yang dapat menerbitkan SQ yang telah disetujui.",403);
     assertUnpublished(draft);

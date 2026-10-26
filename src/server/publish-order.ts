@@ -1,3 +1,5 @@
+import { validateCommercialQuote } from "./commercial-service";
+import { validateSQCatalogue } from "./integrations/sq-catalogue";
 import "server-only";
 import { validateOrderQuotation } from "./quotation";
 import type { Actor, Draft } from "../lib/domain";
@@ -13,6 +15,7 @@ import { normalizeDocumentDetail, row } from "./accurate/normalize";
 type Store=ReturnType<typeof getStore>;
 const moduleFor=(draft:Draft)=>draft.kind==="PO"?"purchase-order":draft.kind==="SQ"?"sales-quotation":"sales-order";
 export async function checkPublicationReferences(actor:Actor,draft:Draft) {
+  if(draft.kind==="SQ"){await validateSQCatalogue(actor,draft.payload);await validateCommercialQuote(actor,draft);}
   await validateAccurateReferences(actor,draft.kind,draft.payload);
   await validateOrderQuotation(actor,draft);
   if(draft.payload.type!=="transaction")return;

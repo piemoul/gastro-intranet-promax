@@ -1,3 +1,4 @@
+import { quoteOptionsSchema,linePricingSchema } from "./commercial";
 import { z } from "zod";
 import type { AccurateSource, DraftKind, DraftPayload } from "./domain";
 
@@ -13,13 +14,15 @@ export const transactionLineSchema = z.object({
   itemNo: text, name: text, unit: text, quantity: z.number().finite().min(0).max(1_000_000_000),
   unitPrice: amount, discountPercent: percent, taxPercent: percent, taxBasePercent:percent.default(100), warehouse: text, notes: note,
   project:text.optional().default(""), department:text.optional().default(""), customFields:customFields.optional().default({}),
+  pricing:linePricingSchema.optional(),
   sourceLineId:z.number().int().positive().max(Number.MAX_SAFE_INTEGER).optional(),
-  entrySource:z.object({kind:z.enum(["wms","custom"]),wmsId:z.string().max(100).optional(),brand:text,model:text}).strict().optional(),
+  entrySource:z.object({kind:z.enum(["wms","custom","accurate"]),wmsId:z.string().max(100).optional(),wmsCode:text.optional(),brand:text,model:text}).strict().optional(),
 }).strict().refine(l=>l.itemId>0||l.entrySource?.kind==="custom","ID Accurate wajib kecuali barang custom yang belum dipetakan.");
 
 export const transactionPayloadSchema = z.object({
+  quoteOptions:quoteOptionsSchema.optional(),
   type: z.literal("transaction"), internalNotes:note.optional().default(""), date, partnerId: z.number().int().min(0).max(Number.MAX_SAFE_INTEGER),
-  sqDetails:z.object({subject:text,pic:text,validity:text,delivery:note,installation:note,warranty:note,franco:text,pricingReviewed:z.boolean()}).strict().optional(),
+  sqDetails:z.object({subject:text,pic:text,validity:text,delivery:note,installation:note,warranty:note,franco:text,payment:text.optional(),pricingReviewed:z.boolean()}).strict().optional(),
   partnerNo: text, partnerName: text, currency: z.string().regex(/^[A-Z]{3}$/, "Gunakan kode mata uang tiga huruf."),
   exchangeRate: z.number().finite().positive().max(1_000_000_000), branch: text, paymentTerm: text,
   shipDate: date, address: note, reference: text, salesperson: text, description: note,
@@ -35,6 +38,8 @@ export const itemPayloadSchema = z.object({
 }).strict();
 
 export const customerPayloadSchema = z.object({
+  date:date.optional(),
+  profile:z.object({alias:text,group:text,category:text,branch:text,city:text,province:text,country:text,zipCode:text,salesperson:text,contacts:z.array(z.object({name:text.min(1),position:text,email:z.union([z.literal(""),z.email()]),phone:text}).strict()).max(30)}).strict().optional(),
   type:z.literal("customer"), customerId:z.number().int().positive().max(Number.MAX_SAFE_INTEGER).optional(),
   no:text, name:text, email:z.string().trim().max(254).refine(value => value === "" || z.email().safeParse(value).success,"Alamat email tidak valid."),
   phone:text, address:note, contactName:text, currency:z.string().regex(/^[A-Z]{3}$/), paymentTerm:text,
@@ -81,6 +86,7 @@ export function validateCompletePayload(kind: DraftKind, input: unknown): DraftP
     requireText(payload.unit,["unit"],"Satuan utama diperlukan.");
     if (payload.manageSN) requireText(payload.serialNumberType,["serialNumberType"],"Tipe nomor serial diperlukan.");
   } else {
+    if(kind==="CUSTOMER_CREATE")requireText(payload.date||"",["date"],"Tanggal pengakuan klien diperlukan.");
     requireText(payload.no,["no"],"Kode klien diperlukan.");
     requireText(payload.name,["name"],"Nama klien diperlukan.");
   }

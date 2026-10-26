@@ -11,7 +11,7 @@ export type DocumentDetail = DocumentSummary & {
   dependencyCheck: { complete: false; reason: string };
 };
 export type ItemSummary = { id: number; no: string; name: string; brand: string; model: string; unit: string; itemType: string; active: boolean };
-export type ItemDetail = ItemSummary & { category: string; description: string; manageSerial: boolean; serialType: string; salesPrice: number; purchasePrice: number; units: { name: string; ratio: number }[]; taxName: string; updatedAt: string };
+export type ItemDetail = ItemSummary & { taxRate?:number;taxBasePercent?:number; category: string; description: string; manageSerial: boolean; serialType: string; salesPrice: number; purchasePrice: number; units: { name: string; ratio: number }[]; taxName: string; updatedAt: string };
 export type PartnerSummary = { id: number; no: string; name: string };
 
 export type CustomerSummary = { id: number; no: string; name: string; email: string; phone: string; active: boolean };

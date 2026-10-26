@@ -16,7 +16,7 @@ export function orderPayload(draft:Draft,marker:string):Record<string,string> {
     transDate:date(p.date),currencyCode:p.currency,...(draft.kind!=="SQ"?{rate:String(p.exchangeRate)}:{}),
     cashDiscPercent:String(p.discountPercent),cashDiscount:"0",inclusiveTax:String(p.inclusiveTax),
     taxable:String(p.lines.some(l=>l.taxPercent>0)),
-    description:[p.description,...(draft.kind==="SQ"&&p.sqDetails?Object.entries({Perihal:p.sqDetails.subject,PIC:p.sqDetails.pic,Validitas:p.sqDetails.validity,Pengiriman:p.sqDetails.delivery,Instalasi:p.sqDetails.installation,Garansi:p.sqDetails.warranty,Franco:p.sqDetails.franco}).filter(([,v])=>v).map(([k,v])=>`${k}: ${v}`):[]),draft.kind==="SQ"&&p.shipDate?`Rencana kirim: ${p.shipDate}`:"",draft.kind!=="SO"&&p.reference?`Referensi: ${p.reference}`:"",marker].filter(Boolean).join("\n"),
+    description:[p.description,...(draft.kind==="SQ"&&p.sqDetails?Object.entries({Perihal:p.sqDetails.subject,PIC:p.sqDetails.pic,Pembayaran:p.sqDetails.payment||"",Validitas:p.sqDetails.validity,Pengiriman:p.sqDetails.delivery,Instalasi:p.sqDetails.installation,Garansi:p.sqDetails.warranty,Franco:p.sqDetails.franco}).filter(([,v])=>v).map(([k,v])=>`${k}: ${v}`):[]),draft.kind==="SQ"&&p.shipDate?`Rencana kirim: ${p.shipDate}`:"",draft.kind!=="SO"&&p.reference?`Referensi: ${p.reference}`:"",marker].filter(Boolean).join("\n"),
   };
   if(draft.kind==="PO")params.fillPriceByVendorPrice="false";
   for(const [key,value] of Object.entries({branchName:p.branch,paymentTermName:p.paymentTerm,shipDate:draft.kind!=="SQ"&&p.shipDate?date(p.shipDate):"",toAddress:p.address,...(draft.kind==="SO"?{poNumber:p.reference}:{})})) if(value) params[key]=value;

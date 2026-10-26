@@ -149,24 +149,24 @@ test("master admin may approve across teams but only within an allowed active co
   } finally { store.close(); }
 });
 
-test("master item proposals belong to importer heads; customer proposals belong to sales heads", () => {
+test("master item proposals belong to importer heads; customer creation is Super Admin only", () => {
   const store = new DraftStore(":memory:");
   try {
     const item = {...emptyItem(),no:"ITEM-X",name:"Item X",unit:"PCS"};
     const customer = {...emptyCustomer(),no:"CLIENT-X",name:"Client X"};
     for (const staff of [sales,headSales,importer]) assert.throws(() => store.create(staff,{kind:"ITEM_CREATE",payload:item}),code("FORBIDDEN"));
-    for (const staff of [sales,importer,headImporter]) assert.throws(() => store.create(staff,{kind:"CUSTOMER_CREATE",payload:customer}),code("FORBIDDEN"));
+    for (const staff of [sales,headSales,importer,headImporter]) assert.throws(() => store.create(staff,{kind:"CUSTOMER_CREATE",payload:customer}),code("FORBIDDEN"));
     const itemDraft = store.create(headImporter,{kind:"ITEM_CREATE",payload:item});
-    const customerDraft = store.create(headSales,{kind:"CUSTOMER_CREATE",payload:customer});
+    const customerDraft = store.create(admin,{kind:"CUSTOMER_CREATE",payload:customer});
     assert.equal(store.list(admin).length,2);
-    assert.equal(store.list(headSales)[0].id,customerDraft.id);
+    assert.equal(store.get(admin,customerDraft.id).id,customerDraft.id);assert.throws(()=>store.get(headSales,customerDraft.id),code("FORBIDDEN"));
     assert.equal(store.list(headImporter)[0].id,itemDraft.id);
     assert.throws(() => store.create(headImporter,{kind:"ITEM_EDIT",payload:{...item,itemId:10}}),code("SOURCE_REQUIRED"));
     const itemEdit = store.create(admin,{kind:"ITEM_EDIT",payload:{...item,itemId:10},source:{kind:"ITEM",id:10,number:"ITEM-X",fingerprint:"hash"}});
     assert.throws(() => store.update(admin,itemEdit.id,{version:1,payload:{...item,itemId:11}}),code("SOURCE_MISMATCH"));
     const clientEdit = store.create(headSales,{kind:"CUSTOMER_EDIT",payload:{...customer,customerId:22},source:{kind:"CUSTOMER",id:22,number:"CLIENT-X",fingerprint:"hash"}});
     assert.throws(() => store.update(headSales,clientEdit.id,{version:1,payload:{...customer,customerId:23}}),code("SOURCE_MISMATCH"));
-    assert.throws(() => store.create(headSales,{kind:"CUSTOMER_CREATE",payload:{...customer,email:"not-an-email"}}),code("VALIDATION"));
+    assert.throws(() => store.create(admin,{kind:"CUSTOMER_CREATE",payload:{...customer,email:"not-an-email"}}),code("VALIDATION"));
   } finally { store.close(); }
 });
 

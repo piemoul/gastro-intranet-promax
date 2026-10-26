@@ -37,6 +37,8 @@ import {
   ResearchView,
 } from "./record-views";
 import { Notice, post } from "./ui";
+import { ManageItemsView } from "./manage-items";
+import { CommercialSettingsView,QuotationReportsView,SupplierDirectoryView } from "./commercial-views";
 import { UsersView } from "./users-view";
 
 type NavItem = { id: string; label: string; icon: typeof Box; group: string };
@@ -110,6 +112,10 @@ export function IntranetApp({
         ]
       : []),
     { id: "items", label: "Master Barang", icon: Box, group: "DATA UTAMA" },
+    ...(head ? [{id:"manage-items",label:"Manage Items",icon:Box,group:"DATA KOMERSIAL"}] : []),
+    {id:"suppliers",label:"Master Supplier",icon:Building2,group:"DATA UTAMA"},
+    ...(sales ? [{id:"reports",label:"Laporan SQ",icon:ClipboardList,group:"PENJUALAN"}] : []),
+    ...(admin ? [{id:"commercial-settings",label:"Pengaturan Harga & Terms",icon:Building2,group:"ADMINISTRASI"}] : []),
     ...(actor.role === "head_sales" || admin
       ? [
           {
@@ -391,7 +397,7 @@ export function IntranetApp({
           />
         ) : view === "approvals" && head ? (
           <ApprovalsView onOpen={openDraft} refresh={refresh} />
-        ) : view === "items" ? (
+        ) : view === "manage-items" && head ? (<ManageItemsView actor={actor} onDirtyChange={setEditorDirty}/>) : view === "commercial-settings" && admin ? (<CommercialSettingsView onDirtyChange={setEditorDirty}/>) : view === "reports" && sales ? (<QuotationReportsView onOpen={openDraft}/>) : view === "suppliers" ? (<SupplierDirectoryView/>) : view === "items" ? (
           <MasterView actor={actor} onOpen={openDraft} refresh={refresh} />
         ) : view === "customers" && (actor.role === "head_sales" || admin) ? (
           <MasterView

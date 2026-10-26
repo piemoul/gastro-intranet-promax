@@ -5,7 +5,7 @@ export const row = (value: unknown): Row => value !== null && typeof value === "
 export const text = (value: unknown): string => typeof value === "string" ? value : typeof value === "number" ? String(value) : "";
 export const number = (value: unknown): number => value !== null && value !== undefined && Number.isFinite(Number(value)) ? Number(value) : 0;
 const name = (value: unknown): string => text(row(value).name);
-const list = (value: unknown): unknown[] => Array.isArray(value) ? value : [];
+export const list = (value: unknown): unknown[] => Array.isArray(value) ? value : [];
 function customFields(d: Row): Record<string, string> {
   const result: Record<string, string> = {};
   for (const [key, value] of Object.entries(d)) {
@@ -57,7 +57,7 @@ export function normalizeItem(value: unknown): ItemSummary {
 }
 export function normalizeItemDetail(value: unknown): ItemDetail {
   const d = row(value); const units = [1, 2, 3, 4, 5].map(i => ({ name: name(d[`unit${i}`]) || text(d[`unit${i}Name`]), ratio: i === 1 ? 1 : number(d[`ratio${i}`]) })).filter(u => u.name);
-  return { ...normalizeItem(d), category: name(d.itemCategory), description: text(d.notes), manageSerial: d.manageSN === true, serialType: text(d.serialNumberType), salesPrice: number(d.unitPrice || d.unitPrice1), purchasePrice: number(d.unitCost || d.cost), units, taxName: name(d.tax1), updatedAt: text(d.lastUpdate) };
+  return { ...normalizeItem(d), taxRate:number(row(d.tax1).rate),taxBasePercent:number(d.percentTaxable)||100,category: name(d.itemCategory), description: text(d.notes), manageSerial: d.manageSN === true, serialType: text(d.serialNumberType), salesPrice: number(d.unitPrice || d.unitPrice1), purchasePrice: number(d.unitCost || d.cost), units, taxName: name(d.tax1), updatedAt: text(d.lastUpdate) };
 }
 export function normalizePage<T>(response: AccurateResponse<unknown>, transform: (value: unknown) => T, page: number): Paged<T> {
   const items = list(response.d).map(transform);

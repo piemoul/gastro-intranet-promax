@@ -7,7 +7,8 @@ export const READ_ENDPOINTS = [
   "sales-order/list.do", "sales-order/detail.do",
   "item/list.do", "item/detail.do",
   "warehouse/list.do",
-  "customer/list.do", "customer/detail.do", "vendor/list.do",
+  "customer/list.do", "customer/detail.do", "vendor/list.do", "vendor/detail.do",
+  "branch/list.do", "currency/list.do", "payment-term/list.do",
 ] as const;
 export type ReadEndpoint = (typeof READ_ENDPOINTS)[number];
 export type CompanyId = 1 | 2 | 3;

@@ -1,3 +1,6 @@
+import { commercialGet,commercialWrite } from "@/server/commercial-api";
+import { validateCommercialQuote } from "@/server/commercial-service";
+import { publishCustomer,reconcileCustomer } from "@/server/publish-customer";
 import { validateQuotationSelection } from "@/server/quotation";
 import { publishOrder,reconcileOrder } from "@/server/publish-order";
 import { cookies } from "next/headers";
@@ -25,9 +28,15 @@ const idSchema=z.coerce.number().int().positive().max(Number.MAX_SAFE_INTEGER);
 function assertHead(actor:Actor,kind:"PO"|"SQ"|"SO"|"ITEM"|"CUSTOMER"){if(actor.role==="master_admin")return;if(kind==="ITEM"?actor.role!=="head_importer":kind==="PO"?actor.role!=="head_importer":actor.role!=="head_sales")throw new AuthError("Akses ini hanya untuk kepala bagian terkait.");}
 export async function GET(request:Request,context:Context){return handle(async()=>{
   const actor=await requireActor(),{path}=await context.params,route=path.join("/"),url=new URL(request.url);const search=(url.searchParams.get("search")||"").slice(0,150);const page=z.coerce.number().int().min(1).max(10000).parse(url.searchParams.get("page")||1);
+  if(path[0]==="commercial")return commercialGet(actor,path,url);
+  if(route==="catalogue/accurate"){
+    if(search.trim().length<2)return json({items:[],hasMore:false});
+    const result=await searchItems(actor.companyId,search,page);
+    return json({items:result.items.filter(item=>item.active&&item.id>0&&item.no),hasMore:result.pageCount>page});
+  }
   if(route==="session")return json({actor,companies:COMPANIES.filter(c=>actor.companyIds.includes(c.id)),connections:getConnectionStatus().filter(c=>actor.companyIds.includes(c.companyId as 1|2|3))});
   if(route.startsWith("catalogue/")){
-    if(!["sales","head_sales","master_admin"].includes(actor.role))throw new AuthError("Katalog SQ hanya untuk bagian sales.");
+    if(!["sales","head_sales","importer","head_importer","master_admin"].includes(actor.role))throw new AuthError("Katalog SQ hanya untuk bagian sales.");
     if(route==="catalogue/wms")return json(await wmsCatalog(actor.companyId,{search,page:String(page),brand:(url.searchParams.get("brand")||"").slice(0,150),model:(url.searchParams.get("model")||"").slice(0,150)}));
     if(route==="catalogue/resolve"){
       const result=await resolveWmsItem(actor,z.string().min(1).max(150).parse(url.searchParams.get("code")),z.string().min(1).max(100).parse(url.searchParams.get("wmsId")));
@@ -53,6 +62,7 @@ export async function GET(request:Request,context:Context){return handle(async()
 });}
 export async function POST(request:Request,context:Context){return handle(async()=>{
   const input=await body(request),actor=await requireActor(),{path}=await context.params,route=path.join("/");
+  if(path[0]==="commercial")return commercialWrite(actor,path,input);
   if(route==="auth/logout"){const jar=await cookies(),token=jar.get(SESSION_COOKIE)?.value;if(token)await getUsers().logout(token);jar.delete(SESSION_COOKIE);return json({ok:true});}
   if(route==="session/company"){const {companyId}=z.object({companyId:z.union([z.literal(1),z.literal(2),z.literal(3)])}).strict().parse(input);return json({actor:await getUsers().changeCompany((await cookies()).get(SESSION_COOKIE)!.value,companyId)});}
   if(route==="users"){const user=publicUser(await getUsers().save(actor,input));return json({user},201);}
@@ -69,13 +79,14 @@ export async function POST(request:Request,context:Context){return handle(async(
     const {kind,payload:raw,requestId}=z.object({kind:draftKindSchema,payload:z.unknown(),requestId:z.string().max(100).optional()}).strict().parse(input);assertCreateKind(actor,kind,false);if(["ITEM_EDIT","CUSTOMER_EDIT"].includes(kind))throw new AuthError("Buka master Accurate untuk membuat usulan perubahan.",400);
     const payload=parseDraftPayload(kind,raw);if(kind==="SQ")await validateSQCatalogue(actor,payload);await validateAccurateReferences(actor,kind,payload);return json({draft:await getStore().create(actor,{kind,payload,requestId})},201);
   }
-  if(path[0]==="drafts"&&path[2]==="publish"&&path.length===3){const {version,confirmed}=z.object({version:versionSchema,confirmed:z.literal(true)}).strict().parse(input);if(confirmed)return json({draft:await publishOrder(actor,path[1],version)});}
-  if(path[0]==="drafts"&&path[2]==="reconcile"&&path.length===3){const {version,number}=z.object({version:versionSchema,number:z.string().trim().min(1).max(150)}).strict().parse(input);return json({draft:await reconcileOrder(actor,path[1],version,number)});}
-  if(path[0]==="drafts"&&path[2]==="action"&&path.length===3){const data=z.object({version:versionSchema,action:draftActionSchema,reason:reasonSchema.optional()}).strict().parse(input),draft=await getStore().get(actor,path[1]);assertTransition(actor,draft,data.action,data.reason||"");if(data.action==="promote")await validateQuotationSelection(actor,draft);if(["submit","approve","promote"].includes(data.action)){await validateAccurateReferences(actor,draft.kind,draft.payload);await validateSourceUnchanged(actor,draft);}return json({draft:await getStore().transition(actor,path[1],data)});}
+  if(path[0]==="drafts"&&path[2]==="publish"&&path.length===3){const {version,confirmed}=z.object({version:versionSchema,confirmed:z.literal(true)}).strict().parse(input);if(confirmed){const draft=await getStore().get(actor,path[1]);return json({draft:await(draft.kind==="CUSTOMER_CREATE"?publishCustomer:publishOrder)(actor,path[1],version)});}}
+  if(path[0]==="drafts"&&path[2]==="reconcile"&&path.length===3){const {version,number}=z.object({version:versionSchema,number:z.string().trim().min(1).max(150)}).strict().parse(input);return json({draft:await((await getStore().get(actor,path[1])).kind==="CUSTOMER_CREATE"?reconcileCustomer:reconcileOrder)(actor,path[1],version,number)});}
+  if(path[0]==="drafts"&&path[2]==="action"&&path.length===3){const data=z.object({version:versionSchema,action:draftActionSchema,reason:reasonSchema.optional()}).strict().parse(input),draft=await getStore().get(actor,path[1]);assertTransition(actor,draft,data.action,data.reason||"");if(data.action==="approve")await validateCommercialQuote(actor,draft);if(data.action==="promote")await validateQuotationSelection(actor,draft);if(["submit","approve","promote"].includes(data.action)){await validateAccurateReferences(actor,draft.kind,draft.payload);await validateSourceUnchanged(actor,draft);}return json({draft:await getStore().transition(actor,path[1],data)});}
   throw new AuthError("Tindakan tidak tersedia. Accurate hanya dapat dibaca.",405);
 });}
 export async function PUT(request:Request,context:Context){return handle(async()=>{
   const input=await body(request),actor=await requireActor(),{path}=await context.params;
+  if(path[0]==="commercial")return commercialWrite(actor,path,input);
   if(path[0]==="users"&&path.length===2){const user=publicUser(await getUsers().save(actor,input,path[1]));return json({user});}
   if(path[0]==="drafts"&&path.length===2){const data=z.object({version:versionSchema,payload:z.unknown()}).strict().parse(input),draft=await getStore().get(actor,path[1]);assertEdit(actor,draft);const payload=parseDraftPayload(draft.kind,data.payload);if(draft.kind==="SQ")await validateSQCatalogue(actor,payload);await validateAccurateReferences(actor,draft.kind,payload);await validateSourceUnchanged(actor,draft);return json({draft:await getStore().update(actor,path[1],{version:data.version,payload})});}
   throw new AuthError("Tindakan tidak tersedia. Accurate hanya dapat dibaca.",405);

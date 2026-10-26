@@ -212,6 +212,7 @@ export class DraftStore {
     return this.transaction(() => {
       const before=this.get(actor,id);
       this.checkVersion(before,versionSchema.parse(version));
+      if(before.kind==="CUSTOMER_CREATE"&&before.payload.type==="customer"&&this.db.prepare("SELECT id FROM drafts WHERE company_id=? AND kind='CUSTOMER_CREATE' AND id<>? AND lower(json_extract(document,'$.payload.no'))=lower(?) AND json_extract(document,'$.status') IN ('PUBLISHING','UNCERTAIN','PUBLISHED') LIMIT 1").get(before.companyId,before.id,before.payload.no))throw new WorkflowError("CUSTOMER_RESERVED","Kode klien sudah terikat publikasi lain. Lakukan rekonsiliasi.",409);
       const after=beginPublication(actor,before);
       this.write(after); this.appendAudit(actor,"accurate_reserved",before,after,"");
       return after;

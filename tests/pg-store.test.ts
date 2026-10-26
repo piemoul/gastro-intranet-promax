@@ -3,6 +3,8 @@ import { randomUUID } from "node:crypto";
 import { test } from "node:test";
 import postgres, { type Sql } from "postgres";
 import { PgDraftStore } from "../src/server/pg-store";
+import { PgCommercialStore } from "../src/server/commercial-store";
+import { defaultSettings } from "../src/lib/commercial";
 import { createSql, ensureSchema } from "../src/server/postgres";
 import { WorkflowError } from "../src/server/workflow";
 import { emptyTransaction, emptyItem, emptyCustomer, type Actor, type Role, type TransactionPayload } from "../src/lib/domain";
@@ -38,6 +40,37 @@ test("PostgreSQL persistence, permissions, concurrency and rollback in an isolat
     const first = new PgDraftStore(firstSql), second = new PgDraftStore(secondSql);
     await Promise.all([first.ready(), second.ready()]);
     const sql = firstSql;
+
+    await t.test("commercial settings serialize concurrent edits, isolate PT and roll back with their append-only audit",async()=>{
+      const a=new PgCommercialStore(firstSql!),b=new PgCommercialStore(secondSql!);
+      await Promise.all([a.ready(),b.ready()]);
+      await a.save(admin,"SETTINGS","default",0,defaultSettings());
+      await assert.rejects(b.save(head,"SETTINGS","default",1,defaultSettings()),code("FORBIDDEN"));
+      const results=await Promise.allSettled([a.save(admin,"SETTINGS","default",1,{...defaultSettings(),footer:"one"}),b.save(admin,"SETTINGS","default",1,{...defaultSettings(),footer:"two"})]);
+      assert.equal(results.filter(r=>r.status==="fulfilled").length,1);
+      const failed=results.find(r=>r.status==="rejected");assert.equal(failed?.status==="rejected"&&failed.reason.code,"VERSION_CONFLICT");
+      assert.equal(await a.get({...admin,companyId:2},"SETTINGS","default"),null);
+      assert.equal((await a.audit(head)).length,2);
+      await assert.rejects(sql`DELETE FROM intranet_commercial_audit`,/append-only/);
+      await assert.rejects(sql`TRUNCATE intranet_commercial_audit`,/append-only/);
+      await sql`CREATE FUNCTION intranet_test_reject_commercial() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN RAISE EXCEPTION 'Fixture commercial audit rejection'; END; $$`;
+      await sql`CREATE TRIGGER intranet_test_reject_commercial BEFORE INSERT ON intranet_commercial_audit FOR EACH ROW EXECUTE FUNCTION intranet_test_reject_commercial()`;
+      const before=await a.get(admin,"SETTINGS","default");
+      await assert.rejects(b.save(admin,"SETTINGS","default",2,{...defaultSettings(),footer:"rollback"}),/Fixture commercial audit rejection/);
+      assert.deepEqual(await a.get(admin,"SETTINGS","default"),before);
+      await sql`DROP TRIGGER intranet_test_reject_commercial ON intranet_commercial_audit`;
+    });
+
+    await t.test("two approved customer drafts with the same code cannot both reserve a live send",async()=>{
+      const p={...emptyCustomer(),no:"PG-NEW-CLIENT",name:"Isolated client"};
+      const a=await first.create(admin,{kind:"CUSTOMER_CREATE",payload:p});
+      const b=await second.create(admin,{kind:"CUSTOMER_CREATE",payload:{...p,no:p.no.toLowerCase()}});
+      const approve=async(store:PgDraftStore,id:string)=>{const submitted=await store.transition(admin,id,{version:1,action:"submit"});return store.transition(admin,id,{version:submitted.version,action:"approve"});};
+      const [one,two]=await Promise.all([approve(first,a.id),approve(second,b.id)]);
+      const results=await Promise.allSettled([first.reservePublication(admin,a.id,one.version),second.reservePublication(admin,b.id,two.version)]);
+      assert.equal(results.filter(r=>r.status==="fulfilled").length,1);
+      const failed=results.find(r=>r.status==="rejected");assert.equal(failed?.status==="rejected"&&failed.reason.code,"CUSTOMER_RESERVED");
+    });
 
     await t.test("permissions, company boundary and master-created business teams", async () => {
       const draft = await first.create(sales, { kind: "SQ", payload: entryPayload() });
@@ -137,7 +170,7 @@ test("PostgreSQL persistence, permissions, concurrency and rollback in an isolat
       await assert.rejects(first.create(head, { kind: "ITEM_CREATE", payload: item }), code("FORBIDDEN"));
       await assert.rejects(first.create(headImporter, { kind: "CUSTOMER_CREATE", payload: customer }), code("FORBIDDEN"));
       await first.create(headImporter, { kind: "ITEM_CREATE", payload: item });
-      await first.create(head, { kind: "CUSTOMER_CREATE", payload: customer });
+      await first.create(admin, { kind: "CUSTOMER_CREATE", payload: customer });
       const edited = await first.create(headImporter, { kind: "ITEM_EDIT", payload: { ...item, itemId: 8 }, source: { kind: "ITEM", id: 8, number: "Fixture-item", fingerprint: "fixture" } });
       await assert.rejects(first.update(headImporter, edited.id, { version: 1, payload: { ...item, itemId: 9 } }), code("SOURCE_MISMATCH"));
     });

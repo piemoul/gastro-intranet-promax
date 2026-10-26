@@ -1,6 +1,6 @@
 # Peta proyek dan deployment Docker lokal
 
-Dipetakan dari `ko-indra/gastro-intranet`, branch `main`, commit `b6b29ee` (`Publish quotations to Accurate before selecting sales orders`), kemudian diperbarui untuk revisi UI dan milestone SQ pertama pada 25 Oktober 2026. Repository tujuan: https://github.com/piemoul/gastro-intranet-promax. Lihat [pemeriksaan UX](ui-responsive-review.md) dan [environment deployment](environment.md).
+Dipetakan dari `ko-indra/gastro-intranet`, branch `main`, commit `b6b29ee` (`Publish quotations to Accurate before selecting sales orders`), kemudian diperbarui untuk milestone SQ dan kelengkapan komersial pada 26 Oktober 2026. Repository tujuan: https://github.com/piemoul/gastro-intranet-promax. Lihat [pemetaan fungsi Intra](intra-functional-parity-plan.md), [pemeriksaan UX](ui-responsive-review.md) dan [environment deployment](environment.md).
 
 ## Akses dan runtime
 
@@ -37,7 +37,9 @@ flowchart TD
   Rules --> Store[DraftStore dan UserStore]
   Store --> SQLite[(SQLite: volume intranet_data)]
   Rules --> Read[Transport Accurate GET allowlist]
-  Rules --> Publish[Publikasi SQ / PO / SO terkontrol]
+  Rules --> Commercial[Parameter SKU, pricebook, settings dan followup]
+  Commercial --> OwnData[(commercial.sqlite / intranet_commercial_*)]
+  Rules --> Publish[Publikasi SQ / PO / SO / klien baru terkontrol]
   Publish --> Reserve[Reservasi dan audit persisten]
   Reserve --> Create[Create transport: sekali kirim]
   Read --> Accurate[Accurate per PT]
@@ -65,6 +67,10 @@ flowchart TD
 | Sumber dan SQ | `src/server/draft-sources.ts`, `quotation.ts` | Identitas sumber Accurate, kesesuaian referensi, pemilihan SQ dan turunan SO. |
 | Pembacaan Accurate | `src/server/accurate/service.ts`, `transport.ts`, `normalize.ts` | Pencarian, list/detail GET allowlist, normalisasi dan isolasi kredensial per PT. |
 | Penerbitan Accurate | `src/server/publish-order.ts`, `publication-state.ts`, `accurate/order-payload.ts`, `create-transport.ts` | Reservasi, payload terbatas, pengiriman tunggal dan verifikasi hasil. |
+| Manage Items dan komersial | `src/lib/commercial.ts`, `src/server/commercial-service.ts`, `commercial-api.ts`, `commercial-store.ts` | SKU canonical, pemetaan WMS, tier/biaya/kurs, snapshot, analisis, revisi/followup, OCC dan audit. |
+| UI komersial | `src/components/manage-items.tsx`, `commercial-views.tsx`, `quote-commercial-panel.tsx` | Pilihan SKU Accurate/WMS, parameter, settings, supplier, pencarian dashboard dan laporan. |
+| Klien baru | `src/server/publish-customer.ts`, `accurate/customer-create-transport.ts` | Super Admin, create-only, cek duplikasi, satu pengiriman serta rekonsiliasi baca. |
+| Cetak SQ | `src/app/quotes/[id]/print/page.tsx` | Halaman authenticated sesuai PT/pemilik, snapshot terms, tanpa biaya/catatan internal. |
 | CI / produksi Vercel | `.github/workflows/ci.yml`, `scripts/deploy-verified.mjs` | Pemeriksaan sebelum rilis commit terverifikasi; terpisah dari Docker lokal. |
 
 ## Domain bisnis

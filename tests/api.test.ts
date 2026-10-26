@@ -9,6 +9,7 @@ import { createRequestStoreForAPI } from "next/dist/server/async-storage/request
 import { workAsyncStorage, type WorkStore } from "next/dist/server/app-render/work-async-storage.external";
 import { workUnitAsyncStorage } from "next/dist/server/app-render/work-unit-async-storage.external";
 import { emptyCustomer, emptyTransaction, type Draft, type Role, type TransactionPayload } from "../src/lib/domain";
+import { emptyManagedItem,defaultSettings } from "../src/lib/commercial";
 
 test("authenticated API integration uses isolated databases and allowlisted read-only fixtures", async context => {
   const originalFetch=globalThis.fetch;
@@ -153,7 +154,7 @@ test("authenticated API integration uses isolated databases and allowlisted read
       assert.equal((await request("POST","session/company",adminToken,{companyId:1})).status,200);
     });
 
-    await context.test("master and sales head can create customer proposals; other roles cannot",async()=>{
+    await context.test("only Super Admin can create customer drafts; sales head retains read-only customer references",async()=>{
       const payload={...emptyCustomer(),no:"NEW-CLIENT",name:"New Customer"};
       const before=reads.length;
       for(const role of ["sales","importer","head_importer"]) {
@@ -161,7 +162,7 @@ test("authenticated API integration uses isolated databases and allowlisted read
         assert.equal((await request("GET","accurate/customers",tokens[role])).status,403);
       }
       assert.equal(reads.length,before);
-      assert.equal((await request("POST","drafts",tokens.head_sales,{kind:"CUSTOMER_CREATE",payload,requestId:"sales-head-client"})).status,201);
+      assert.equal((await request("POST","drafts",tokens.head_sales,{kind:"CUSTOMER_CREATE",payload,requestId:"sales-head-client"})).status,403);
       assert.equal((await request("POST","drafts",adminToken,{kind:"CUSTOMER_CREATE",payload,requestId:"master-client"})).status,201);
       assert.equal((await request("GET","accurate/customers",adminToken)).status,200);
     });
@@ -274,6 +275,56 @@ test("authenticated API integration uses isolated databases and allowlisted read
       } finally {globalThis.fetch=previous;}
     });
 
+    await context.test("Manage Items validates source identity, versions, roles and the session PT before saving parameters",async()=>{
+      assert.equal((await request("GET","commercial/items/32")).status,401);
+      assert.equal((await request("GET","commercial/items/32",tokens.sales)).status,403);
+      const found=await request("GET","catalogue/accurate?search=SKU-32&companyId=3",tokens.sales);
+      assert.equal(found.status,200);assert.equal((await found.json()).items[0].id,32);assert.equal(reads.at(-1)?.company,1);
+      const p={...emptyManagedItem(),accurateId:32,accurateNo:item.no,name:"Forged display name",brand:"Fake",model:"Fake",unit:"PCS",tiers:[150,160,170,180,190,200],buyPrices:[{id:"buy",description:"Fixture",price:100,currency:"IDR"}],multipliers:[{id:"cost",description:"Fixture",value:1.2}],selectedBuyPrice:"buy",selectedMultiplier:"cost"};
+      const before=reads.length;
+      assert.equal((await request("PUT","commercial/items/32",tokens.head_sales,{version:0,data:p})).status,403);assert.equal(reads.length,before);
+      assert.equal((await request("PUT","commercial/items/32",adminToken,{version:0,data:{...p,accurateNo:"MADE-UP"}})).status,409);
+      const saved=await request("PUT","commercial/items/32",adminToken,{version:0,data:p});assert.equal(saved.status,200);
+      const record=(await saved.json()).record;assert.equal(record.data.name,item.name);assert.equal(record.data.brand,"Fixture Brand");
+      assert.equal((await request("PUT","commercial/items/32",adminToken,{version:0,data:p})).status,409);
+      assert.equal((await request("POST","session/company",adminToken,{companyId:2})).status,200);
+      assert.deepEqual((await (await request("GET","commercial/items",adminToken)).json()).items,[]);
+      await request("POST","session/company",adminToken,{companyId:1});
+      assert.equal((await request("PUT","commercial/settings",tokens.head_sales,{version:0,data:defaultSettings()})).status,403);
+      assert.equal((await request("PUT","commercial/settings",adminToken,{version:0,data:defaultSettings()})).status,200);
+      const mapping={wmsId:"wms-32",wmsCode:item.no,accurateId:32,accurateNo:item.no,active:true,reason:"Verified fixture"};
+      assert.equal((await request("PUT","commercial/mappings/wms-32",adminToken,{version:0,data:{...mapping,wmsCode:"WRONG"}})).status,409);
+      assert.equal((await request("PUT","commercial/mappings/wms-32",adminToken,{version:0,data:mapping})).status,200);
+    });
+
+    await context.test("pricebook application, analysis, duplicate retries and followups enforce ownership and audit without Accurate writes",async()=>{
+      const created=await request("POST","drafts",tokens.sales,{kind:"SQ",payload:transaction(),requestId:"pricebook-entry"});
+      assert.equal(created.status,201);const d=(await created.json()).draft as Draft;
+      const endpoint=`commercial/drafts/${d.id}/apply-pricebook`,input={version:d.version,choices:[{lineId:"local-line",tier:0}]};
+      assert.equal((await request("POST",endpoint,tokens.sales,input)).status,403);
+      const response=await request("POST",endpoint,tokens.head_sales,input);assert.equal(response.status,200);
+      const priced=(await response.json()).draft as Draft;assert.equal(priced.payload.type==="transaction"&&priced.payload.lines[0].unitPrice,150);
+      assert.equal((await request("POST",endpoint,tokens.head_sales,input)).status,409);
+      assert.equal((await request("GET",`commercial/analysis/${d.id}`,tokens.sales)).status,403);
+      const analysis=await request("GET",`commercial/analysis/${d.id}`,tokens.head_sales);assert.equal(analysis.status,200);assert.equal((await analysis.json()).knownCogs,240);
+      const duplicate=`commercial/drafts/${d.id}/duplicate`,copyInput={version:priced.version,requestId:"same-local-copy"};
+      const one=await request("POST",duplicate,tokens.sales,copyInput),two=await request("POST",duplicate,tokens.sales,copyInput);
+      assert.equal(one.status,201);assert.equal(two.status,201);const copied=(await one.json()).draft as Draft;
+      assert.equal((await two.json()).draft.id,copied.id);assert.equal(copied.payload.type==="transaction"&&copied.payload.lines[0].unitPrice,0);
+      assert.equal((await request("POST",duplicate,tokens.other_sales,copyInput)).status,403);
+      const followup={ownerId:"forged-owner",teamId:"forged-team",status:"SENT",sentAt:"2026-10-26",nextContact:"",notes:"Isolated fixture"};
+      assert.equal((await request("PUT",`commercial/followup/${d.id}`,tokens.other_sales,{version:0,data:followup})).status,403);
+      const followed=await request("PUT",`commercial/followup/${d.id}`,tokens.sales,{version:0,data:followup});assert.equal(followed.status,200);assert.equal((await followed.json()).record.data.ownerId,d.ownerId);
+      const {validateCommercialQuote}=await import("../src/server/commercial-service");
+      await validateCommercialQuote(admin,priced);
+      const {getCommercialStore}=await import("../src/server/commercial-store");
+      const record=await getCommercialStore().get(admin,"ITEM","32");
+      await getCommercialStore().save(admin,"ITEM","32",record!.version,record!.data);
+      await assert.rejects(validateCommercialQuote(admin,priced),{code:"PRICEBOOK_CHANGED"});
+      assert.ok((await store.audit(admin,d.id)).some(a=>a.action==="update"));
+      assert.ok(reads.every(r=>r.method==="GET"));
+    });
+
     await context.test("API account changes revoke old sessions immediately and logout removes access",async()=>{
       const edited=await request("PUT",`users/${otherSales.id}`,adminToken,{name:"Disabled User",role:"sales",companyIds:[1],active:false});
       assert.equal(edited.status,200);
@@ -283,7 +334,7 @@ test("authenticated API integration uses isolated databases and allowlisted read
     });
   }finally{
     globalThis.fetch=originalFetch;
-    await users.close(); await store.close();
+    await users.close(); await store.close();await (await import("../src/server/commercial-store")).getCommercialStore().close();
     for(const key of envKeys)if(savedEnv[key]===undefined)delete process.env[key];else process.env[key]=savedEnv[key];
     rmSync(dir,{recursive:true,force:true});
   }
