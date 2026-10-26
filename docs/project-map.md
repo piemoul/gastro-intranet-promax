@@ -129,7 +129,7 @@ docker compose --env-file .env.local stop
 
 ## Verifikasi
 
-Build Linux Docker berhasil menjalankan lint, typecheck, **80 tes lulus, 0 gagal, 2 dilewati**, dan build produksi. Dua tes yang dilewati memerlukan database PostgreSQL pengujian eksplisit. Tes symlink yang sebelumnya ditolak Windows berhasil pada Linux container.
+Build Linux Docker 26 Oktober 2026 berhasil menjalankan lint, typecheck, **95 tes lulus, 0 gagal, 2 dilewati**, dan build produksi. Dua suite PostgreSQL memerlukan database pengujian eksplisit; suite draft/komersial dijalankan terpisah pada PostgreSQL 17 lokal terisolasi dan lulus. Tes symlink yang ditolak Windows berhasil pada Linux container. Parameter, followup dan publikasi baru diuji menggunakan fixture/mocked writes.
 
 HTTP lokal dan publik: `/login` 200, `/privacy` 200, serta `/api/session` dan `/api/drafts` tanpa autentikasi 401. Graphify Studio lokal membalas 200. Pemeriksaan browser tidak menemukan error JavaScript. Google OAuth end-to-end telah berhasil: tombol login → Google account chooser → akun developer yang diminta → Dashboard Intranet dengan tiga pilihan PT dan draft lokal kosong. Pengujian tidak membuat dokumen komersial.
 

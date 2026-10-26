@@ -142,6 +142,8 @@ export function IntranetApp({
       ? [{ id: "users", label: "Pengguna", icon: Users, group: "ADMINISTRASI" }]
       : []),
   ];
+  const groupOrder=["WORKSPACE","PENJUALAN","PEMBELIAN","KELOLA","DATA UTAMA","DATA KOMERSIAL","ADMINISTRASI","LAINNYA"];
+  nav.sort((a,b)=>groupOrder.indexOf(a.group)-groupOrder.indexOf(b.group));
   const activeNav = nav.find((n) => n.id === view) || nav[0];
   const navigate = (next: string) => {
     if (

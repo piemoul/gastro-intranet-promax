@@ -44,3 +44,12 @@ Computer Use memeriksa menu Administration (Users, Roles, Branches, Settings), I
 ## Pemeriksaan referensi live
 
 GET-only pada 26 Oktober 2026 berhasil membaca cabang, mata uang, termin dan supplier untuk GGS/RSP/SRI. Termin yang diterima masing-masing 8/10/11; tidak ada permintaan tulis dalam pemeriksaan ini. Keberhasilan baca tidak membuktikan scope `customer_save`; izin tulis baru akan diketahui pada penerbitan klien bisnis yang benar-benar diminta pengguna. Tidak ada klien atau transaksi percobaan yang dibuat.
+
+## Bukti verifikasi implementasi
+
+- Docker/Linux: lint, typecheck, 95 tes lulus / 0 gagal / 2 suite PostgreSQL dilewati, lalu build produksi. Kedua suite PostgreSQL dijalankan terpisah pada PostgreSQL 17 lokal terisolasi: persistensi draft/komersial, persaingan reservasi klien, OCC/audit dan autentikasi lulus.
+- API fixture memeriksa pilihan canonical SKU, penolakan kode palsu, peran, isolasi PT, pemetaan, penerapan harga, akses analisis, perubahan pricebook, duplikasi idempoten dan kepemilikan followup. Transport/customer publication memakai mock untuk semua write.
+- Browser publik: pencarian Accurate serta WMS pada Manage Items membuka SKU HATCO yang sama tanpa menyimpan parameter. Dashboard membaca SKU GGS/RSP/SRI beserta stok, direktori supplier memuat data, settings dan form klien dapat dibuka, laporan SQ kosong sesuai database.
+- Halaman cetak dirender dari database fixture terpisah menggunakan image produksi, tanpa credential Accurate. Logo, subtotal/diskon/pajak/total, terms, footer dan watermark draft diperiksa secara visual. Canary catatan internal tidak terdapat di HTML. Ini pemeriksaan layout halaman; dialog ekspor PDF pengguna tidak dijalankan.
+- Container aplikasi sehat; login lokal/publik 200 dan endpoint parameter tanpa login 401. WMS live tetap pada image sebelumnya. Setelah QA, database live memiliki 0 draft, 0 audit bisnis, 0 parameter komersial dan 0 audit komersial.
+- Nilai harga/kurs/template lama tidak dimigrasikan otomatis. Pengguna berwenang mengisi parameter bisnis yang benar melalui formulir; tidak ada nilai harga contoh yang disimpan di production.
