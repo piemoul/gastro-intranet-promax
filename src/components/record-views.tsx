@@ -1260,12 +1260,12 @@ export function ResearchView() {
             Super Admin menyetujui dan menerbitkan SQ ke Accurate.
           </p>
           <div className="guide-flow">
-            <span>SQ</span>
-            <ArrowRight size={16} />
-            <span>SQ Accurate</span>
+            <span>Entry sales</span>
             <ArrowRight size={16} />
             <span>Review admin</span>
-            <ArrowRight size={16} /><span>Approval Super Admin</span>
+            <ArrowRight size={16} />
+            <span>Approval Super Admin</span>
+            <ArrowRight size={16} /><span>SQ Accurate</span>
           </div>
           <small>
             Whitelist sales mengikuti Gastro Portal. Barang custom memerlukan
