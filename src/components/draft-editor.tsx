@@ -36,6 +36,7 @@ import { identityKey } from "@/lib/item-selection";
 import type { ItemSummary } from "@/server/accurate/types";
 import { PublicationPanel } from "./publication-panel";
 import { BrandModelPicker } from "./brand-model-picker";
+import { SqCatalogue, SalesEntryFields, emptySqDetails } from "./sq-catalogue";
 import {
   api,
   dateText,
@@ -145,7 +146,7 @@ function EditorForm({
   const publicationLocked = !!draft && ["PUBLISHING", "PUBLISHED", "UNCERTAIN"].includes(draft.status);
   const canEdit = !publicationLocked && !(draft?.kind === "SQ" && draft.source) && (!draft || isHead || ((draft.status === "DRAFT" || draft.status === "REVISION") && draft.ownerId === actor.userId));
   const totals = payload.type === "transaction" ? safeEstimate(payload) : null;
-  const missingWarehouses = payload.type === "transaction" && payload.lines.some(line=>!line.warehouse.trim());
+  const missingWarehouses = payload.type === "transaction" && !(activeKind === "SQ" && actor.role === "sales") && payload.lines.some(line=>!line.warehouse.trim());
   const change = (next: DraftPayload) => {
     setPayload(next);
     setDirty(true);
@@ -279,7 +280,7 @@ function EditorForm({
             <span>
               {draft?.source
                 ? `Referensi Accurate: ${draft.source.number}. Perubahan disimpan sebagai usulan di Intranet.`
-                : "Simpan draft, lalu buat dokumen Accurate pada tahap akhir. SO hanya berasal dari SQ Accurate yang dipilih."}
+                : activeKind === "SQ" ? "Entry barang / Review harga admin / Persetujuan Super Admin / SQ Accurate." : "Simpan draft, lalu buat dokumen Accurate pada tahap akhir. SO hanya berasal dari SQ Accurate yang dipilih."}
             </span>
           </div>
           {error && (
@@ -303,7 +304,7 @@ function EditorForm({
           >
             <fieldset disabled={busy || !canEdit} className="editor-fields">
               {payload.type === "transaction" ? (
-                <TransactionFields
+                activeKind === "SQ" && actor.role === "sales" ? <SalesEntryFields payload={payload} onChange={change}/> : <TransactionFields
                   kind={activeKind}
                   payload={payload}
                   onChange={change}
@@ -402,7 +403,7 @@ function EditorForm({
               {draft?.status === "PUBLISHED" ? `Accurate: ${draft.publication?.accurateNumber || draft.quotation?.number || draft.source?.number}` : "Draft tersimpan di Intranet"}
             </div>
           </section>
-          {draft && draft.kind !== "SQ" && !publicationLocked && (
+          {draft && !publicationLocked && (
             <section className="panel action-panel">
               <h2>Alur persetujuan</h2>
               <p>Semua tindakan pada tahap ini berlaku secara internal.</p>
@@ -414,10 +415,10 @@ function EditorForm({
               <div className="stack-buttons">
                 {["DRAFT", "REVISION"].includes(draft.status) &&
                   canEdit &&
-                  actionButton("submit", "Ajukan persetujuan", true)}
-                {isHead &&
+                  actionButton("submit", activeKind === "SQ" && actor.role === "sales" ? "Ajukan review admin" : "Ajukan persetujuan", true)}
+                {isHead && (draft.kind !== "SQ" || actor.role === "master_admin") &&
                   draft.status === "SUBMITTED" &&
-                  actionButton("approve", "Setujui internal", true)}
+                  actionButton("approve", draft.kind === "SQ" ? "Setujui SQ (Super Admin)" : "Setujui internal", true)}
                 {isHead &&
                   ["SUBMITTED", "APPROVED"].includes(draft.status) &&
                   actionButton("revise", "Kembalikan untuk revisi")}
@@ -699,7 +700,7 @@ function TransactionFields({
                 onChange={(e) => update("shipDate", e.target.value)}
               />
             </Field>
-            <Field label="Nomor identitas salesperson (SO)">
+            <Field label="Nomor salesperson Accurate (SQ / SO)">
               <input
                 value={p.salesperson}
                 onChange={(e) => update("salesperson", e.target.value)}
@@ -721,16 +722,17 @@ function TransactionFields({
           />
         </details>
       </section>
+      {kind === "SQ" && <section className="panel form-panel"><h2>Review komersial SQ</h2><p>Lengkapi harga, pajak, gudang dan ketentuan sebelum diajukan kepada Super Admin.</p><div className="form-grid">{([['subject','Perihal'],['pic','PIC klien'],['validity','Masa berlaku'],['delivery','Pengiriman'],['installation','Instalasi'],['warranty','Garansi'],['franco','Franco']] as const).map(([key,label])=><Field key={key} label={label}><input value={p.sqDetails?.[key]||""} maxLength={500} onChange={e=>update("sqDetails",{...emptySqDetails(),...p.sqDetails,[key]:e.target.value})}/></Field>)}</div><label className="checkbox-field"><input type="checkbox" checked={p.sqDetails?.pricingReviewed||false} onChange={e=>update("sqDetails",{...emptySqDetails(),...p.sqDetails,pricingReviewed:e.target.checked})}/>Harga, pajak, pemetaan custom dan ketentuan telah saya periksa</label></section>}
       <section className="panel form-panel">
         <div className="section-number">02</div>
         <div className="form-section-title">
           <h2>Rincian barang</h2>
-          <p>Pilih barang dari master Accurate perusahaan aktif.</p>
+          <p>{kind === "SQ" ? "Barang WMS dicocokkan dengan master Accurate PT aktif." : "Pilih barang dari master Accurate perusahaan aktif."}</p>
         </div>
-        <BrandModelPicker
+        {kind === "SQ" ? <SqCatalogue payload={p} onChange={onChange}/> : <BrandModelPicker
           onSelect={(option) => void addItem(option)}
           disabled={adding}
-        />
+        />}
         {warehouseOptions.error && <Notice error>Daftar gudang belum dapat dimuat. <button type="button" className="button button-secondary" onClick={()=>setWarehouseRefresh(n=>n+1)}>Coba muat gudang lagi</button></Notice>}
         {!warehouseOptions.loading && !warehouseOptions.error && warehouses.length===0 && <Notice>Tidak ada gudang aktif yang tersedia di Accurate PT ini.</Notice>}
         {adding && <Loading label="Mengambil rincian barang…" />}
@@ -778,6 +780,7 @@ function TransactionFields({
                     <Trash2 size={17} />
                   </button>
                 </div>
+                {kind === "SQ" && line.entrySource?.kind === "custom" && <div className="custom-mapping"><p className="fine-print">{line.itemId ? `Custom dipetakan ke ${line.itemNo}` : "Custom belum dipetakan. Pilih SKU Accurate yang sudah ada."}</p><BrandModelPicker disabled={adding} onSelect={async option=>{setAdding(true);setError("");try{const {item}=await api<{item:{id:number;no:string;unit:string}}>(`/api/accurate/items/${option.id}`);update("lines",p.lines.map(l=>l.id===line.id?{...l,itemId:item.id,itemNo:item.no,unit:item.unit}:l));}catch(e){setError((e as Error).message);}finally{setAdding(false);}}}/></div>}
                 <div className="line-fields">
                   <Field label="Kuantitas">
                     <input

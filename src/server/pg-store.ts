@@ -1,3 +1,4 @@
+import { assertSQEntryFields } from "./sq-policy";
 import { beginPublication, finishPublication, type PublicationResult } from "./publication-state";
 import "server-only";
 import { createHash, randomUUID } from "node:crypto";
@@ -5,7 +6,7 @@ import { z } from "zod";
 import type { JSONValue } from "postgres";
 import type { Actor, AuditEntry, Draft, DraftKind, DraftPayload } from "../lib/domain";
 import { COMPANIES } from "../lib/domain";
-import { draftKindSchema, draftActionSchema, parseDraftPayload, validateCompletePayload, parseAccurateSource, reasonSchema, versionSchema } from "../lib/validation";
+import { draftKindSchema, draftActionSchema, parseDraftPayload, validateSQEntry, validateCompletePayload, parseAccurateSource, reasonSchema, versionSchema } from "../lib/validation";
 import { estimateTransaction } from "../lib/calculations";
 import { assertActor, assertCreateKind, assertDraftAccess, assertEdit, assertTransition, canSeeDraft, quotationReference, WorkflowError } from "./workflow";
 import type { CreateDraftInput, UpdateDraftInput, TransitionDraftInput } from "./store";
@@ -141,6 +142,7 @@ export class PgDraftStore {
     const source = parsed.source == null ? null : validated(() => parseAccurateSource(kind, parsed.source));
     assertCreateKind(actor, kind, source !== null);
     const payload = safePayload(kind, parsed.payload);
+    assertSQEntryFields(actor,kind,payload);
     if (!source && payload.type === "transaction" && payload.lines.some(line => line.sourceLineId !== undefined)) throw new WorkflowError("SOURCE_LINE_MISMATCH", "Draft baru tidak boleh mengklaim referensi baris Accurate.", 400);
     if (kind === "ITEM_EDIT" && (!source || payload.type !== "item" || source.id !== payload.itemId)) throw new WorkflowError("SOURCE_REQUIRED", "Perubahan barang harus menggunakan referensi barang Accurate yang sama.", 400);
     if (kind === "CUSTOMER_EDIT" && (!source || payload.type !== "customer" || source.id !== payload.customerId)) throw new WorkflowError("SOURCE_REQUIRED", "Perubahan klien harus menggunakan referensi klien Accurate yang sama.", 400);
@@ -177,6 +179,8 @@ export class PgDraftStore {
       assertEdit(actor, before);
       await this.checkVersion(transaction, before, parsed.version);
       const payload = safePayload(before.kind, parsed.payload);
+      assertSQEntryFields(actor,before.kind,payload,before.payload);
+      if(before.kind==="SQ"&&actor.role==="sales"&&payload.type==="transaction"&&payload.sqDetails)payload.sqDetails.pricingReviewed=false;
       if (payload.type === "transaction" && before.payload.type === "transaction") {
         const originalLines = new Map(before.payload.lines.map(line => [line.id, line]));
         for (const line of payload.lines) {
@@ -185,7 +189,7 @@ export class PgDraftStore {
       }
       if (before.kind === "ITEM_EDIT" && payload.type === "item" && payload.itemId !== before.source?.id) throw new WorkflowError("SOURCE_MISMATCH", "Referensi barang Accurate tidak boleh diganti.", 400);
       if (before.kind === "CUSTOMER_EDIT" && payload.type === "customer" && payload.customerId !== before.source?.id) throw new WorkflowError("SOURCE_MISMATCH", "Referensi klien Accurate tidak boleh diganti.", 400);
-      const draft: Draft = { ...before, payload, status: "DRAFT", approvedBy: null, version: before.version + 1, updatedAt: new Date().toISOString(), reason: parsed.reason || "" };
+      const draft: Draft = { ...before, payload, status: "DRAFT", approvedBy: null, approvalPolicy:null, version: before.version + 1, updatedAt: new Date().toISOString(), reason: parsed.reason || "" };
       await this.write(transaction, draft);
       await this.appendAudit(transaction, actor, "update", before, draft, draft.reason);
       return draft;
@@ -200,7 +204,8 @@ export class PgDraftStore {
       await this.checkVersion(transaction, before, parsed.version);
       const reason = parsed.reason || "";
       assertTransition(actor, before, parsed.action, reason);
-      if (["submit", "approve"].includes(parsed.action)) safePayload(before.kind, before.payload, true);
+      if(parsed.action==="submit"&&before.kind==="SQ") validated(()=>validateSQEntry(before.payload));
+      else if (["submit", "approve"].includes(parsed.action)) safePayload(before.kind, before.payload, true);
       const now = new Date().toISOString();
       if (parsed.action === "promote" || parsed.action === "demote") {
         const kind = parsed.action === "promote" ? "SO" : "SQ";
@@ -219,7 +224,7 @@ export class PgDraftStore {
         return child;
       }
       const status = parsed.action === "submit" ? "SUBMITTED" : parsed.action === "approve" ? "APPROVED" : parsed.action === "revise" ? "REVISION" : "DRAFT";
-      const draft: Draft = { ...before, status, approvedBy: status === "APPROVED" ? actor.userId : null, version: before.version + 1, updatedAt: now, reason };
+      const draft: Draft = { ...before, status, approvalPolicy:status === "APPROVED" && before.kind === "SQ" ? "SQ_SUPER_ADMIN_V1" : null, approvedBy: status === "APPROVED" ? actor.userId : null, version: before.version + 1, updatedAt: now, reason };
       await this.write(transaction, draft);
       await this.appendAudit(transaction, actor, parsed.action, before, draft, reason);
       return draft;

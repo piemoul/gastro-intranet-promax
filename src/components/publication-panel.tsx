@@ -9,10 +9,10 @@ export function PublicationPanel({draft,actor,dirty,onSaved}:{draft:Draft;actor:
   const [confirm,setConfirm]=useState(false),[busy,setBusy]=useState(false),[error,setError]=useState(""),[number,setNumber]=useState("");
   if(!["PO","SO","SQ"].includes(draft.kind)||draft.source||draft.quotation&&draft.kind==="SQ"||draft.payload.type!=="transaction")return null;
   const isSQ=draft.kind==="SQ";
-  const ready=isSQ?["DRAFT","REVISION","SUBMITTED","APPROVED"].includes(draft.status):draft.status==="APPROVED";
+  const ready=draft.status==="APPROVED";
   const missingWarehouse=draft.payload.lines.some(line=>!line.warehouse.trim());
   const allowed=actor.role==="master_admin"||actor.role===(draft.kind==="PO"?"head_importer":"head_sales");
-  const canPublish=allowed||(isSQ&&actor.role==="sales"&&actor.userId===draft.ownerId);
+  const canPublish=isSQ?actor.role==="master_admin":allowed;
   const locked=["PUBLISHING","UNCERTAIN"].includes(draft.status),published=draft.status==="PUBLISHED";
   const company=COMPANIES.find(c=>c.id===draft.companyId)!;
   const run=async(action:"publish"|"reconcile")=>{

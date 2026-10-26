@@ -18,7 +18,7 @@ export async function validateAccurateReferences(actor:Actor,kind:DraftKind,payl
   const selectedWarehouses=[...new Set(payload.lines.map(line=>line.warehouse).filter(Boolean))];
   if(selectedWarehouses.length){const warehouses=await getWarehouses(actor.companyId);for(const name of selectedWarehouses){if(warehouses.filter(w=>w.name===name).length!==1)throw new AuthError(`Gudang ${name} tidak aktif, tidak ditemukan, atau namanya tidak unik pada PT ini. Pilih ulang gudang dari Accurate.`,409);}}
   // Reads are scoped to selected item IDs. No full catalog scan or stock/serial lookup.
-  const distinct=[...new Set(payload.lines.map(line=>line.itemId))];
+  const distinct=[...new Set(payload.lines.map(line=>line.itemId).filter(id=>id>0))];
   for(const id of distinct){const item=await getItem(actor.companyId,id);const lines=payload.lines.filter(x=>x.itemId===id);if(!item.active||lines.some(line=>line.itemNo!==item.no))throw new AuthError("Pilihan barang berubah atau tidak aktif. Pilih ulang barang dari master Accurate PT ini.",409);for(const line of lines){const units=new Set([item.unit,...item.units.map(u=>u.name)]);if(line.unit&&!units.has(line.unit))throw new AuthError(`Satuan ${line.unit} tidak sesuai master barang ${item.no}.`,409);}}
   if(payload.partnerId){const kindPartner=kind==="PO"?"vendor":"customer";const partner=await findPartnerByNo(actor.companyId,kindPartner,payload.partnerNo);if(!partner||partner.id!==payload.partnerId)throw new AuthError("Pelanggan/pemasok tidak cocok dengan PT aktif. Pilih ulang dari Accurate.",409);payload.partnerName=partner.name;}
 }

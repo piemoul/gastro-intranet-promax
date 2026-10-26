@@ -435,7 +435,7 @@ export function DocumentsView({
           kind === "SO"
             ? "Buat SO dari SQ Accurate terpilih dan simpan catatan internal untuk tim."
             : kind === "SQ"
-              ? "Simpan SQ ke Accurate. Kepala sales memilih SQ yang akan dilanjutkan menjadi SO."
+              ? "Pilih barang dan jumlah dari WMS, review harga admin, lalu persetujuan dan penerbitan SQ oleh Super Admin."
               : "Susun kebutuhan pembelian dan kelola persetujuan internal."
         }
         action={

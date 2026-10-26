@@ -2,12 +2,12 @@
 
 Repository ini dilanjutkan di [piemoul/gastro-intranet-promax](https://github.com/piemoul/gastro-intranet-promax), dengan deployment Docker Desktop melalui [intranet.davay.space](https://intranet.davay.space). Source dan histori awal berasal dari `ko-indra/gastro-intranet`.
 
-Ruang kerja PO, SQ/SO, master barang, dan master klien untuk tiga PT Gastro. Tampilan mengikuti Gastro WMS. **SQ lengkap disimpan ke Accurate oleh sales atau kepala sales; hanya SQ terpilih dapat dilanjutkan menjadi SO. PO/SO baru dapat dibuat di Accurate pada tahap akhir setelah persetujuan dan konfirmasi kepala bagian.** Master serta dokumen Accurate yang sudah ada tetap hanya dibaca; usulan perubahannya tetap lokal.
+Ruang kerja PO, SQ/SO, master barang, dan master klien untuk tiga PT Gastro. Tampilan mengikuti Gastro WMS. **SQ dimulai dari permintaan barang/jumlah sales, dilengkapi admin, lalu disetujui dan diterbitkan ke Accurate hanya oleh Super Admin; hanya SQ terpilih dapat dilanjutkan menjadi SO. PO/SO baru dapat dibuat di Accurate pada tahap akhir setelah persetujuan dan konfirmasi kepala bagian.** Master serta dokumen Accurate yang sudah ada tetap hanya dibaca; usulan perubahannya tetap lokal.
 
 ## Kemampuan saat ini
 
 - Google Sign-In, whitelist email, master admin `malesmikirbos@gmail.com`, pengelolaan empat role melalui dropdown, dan pilihan akses PT.
-- Sales: draft dan penerbitan SQ miliknya. Kepala sales: pemilihan SQ Accurate, persetujuan internal SO, turunan SO lokal, usulan edit SO Accurate, serta usulan tambah/edit klien.
+- Sales: permintaan barang/jumlah dan pengajuan review SQ miliknya melalui katalog WMS. Kepala sales: review harga SQ, pemilihan SQ Accurate, persetujuan internal SO, turunan SO lokal, usulan edit SO Accurate, serta usulan tambah/edit klien.
 - Importer: draft PO miliknya. Kepala importer: persetujuan internal PO serta usulan tambah/edit master barang.
 - Master admin dapat mengelola seluruh fitur dan pengguna. Staff hanya melihat dokumen lokal miliknya; kepala bagian melihat timnya. Dokumen Accurate dibaca oleh kepala bagian sesuai bidangnya.
 - Pencarian barang, customer, vendor, dan transaksi live di Accurate; pemisahan PT; nomor dokumen `LOCAL-...` untuk draft; audit; versi dokumen; pencegahan duplikasi saat retry.
@@ -58,3 +58,5 @@ Riset live Accurate dilakukan melalui `npm run research`, tetap GET-only. Sampel
 Penulisan transaksi/master ke Accurate, penanganan dokumen komersial yang ditandai tidak didukung, dan pemeriksaan dependensi WMS secara lengkap perlu tahap implementasi berikutnya. Source warning ditampilkan sebagai batasan; aplikasi tidak mengklaim dokumen siap diterbitkan hanya karena draft lokal disetujui.
 
 Catatan internal SO disimpan dan diaudit hanya di Intranet; tidak dimasukkan ke payload Accurate. Satu SQ hanya dapat memiliki satu SO aktif di Intranet. Pemilihan SQ serta publikasi SO memeriksa ulang perusahaan, identitas SQ, pelanggan, mata uang, barang, satuan dan jumlah yang tersedia.
+
+Milestone SQ pertama: [whitelist Portal, API WMS, katalog dan approval Super Admin](docs/sq-milestone-one.md).

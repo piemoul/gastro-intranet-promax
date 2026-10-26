@@ -51,5 +51,23 @@ services:
         max-size: "5m"
         max-file: "2"
 
+  wms-read-api:
+    image: gastro-intranet-wms-read:local
+    build:
+      context: .
+      dockerfile: services/Dockerfile.wms-read
+    container_name: gastro-intranet-wms-read
+    restart: unless-stopped
+    init: true
+    env_file: .env.wms-read.local
+    read_only: true
+    security_opt: ["no-new-privileges:true"]
+    cap_drop: ["ALL"]
+    logging:
+      driver: json-file
+      options:
+        max-size: "5m"
+        max-file: "2"
+
 volumes:
   intranet_data:

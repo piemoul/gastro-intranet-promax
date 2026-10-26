@@ -8,7 +8,7 @@ import { emptyTransaction, type Actor, type Draft } from "../src/lib/domain";
 
 const admin:Actor={userId:"admin",name:"Admin",role:"master_admin",companyId:1,companyIds:[1,2,3],teamId:"central"};
 const head:Actor={...admin,userId:"head",role:"head_importer",teamId:"importer"};
-const payload=()=>({...emptyTransaction(),date:"2026-09-25",partnerId:17,partnerNo:"V-17",partnerName:"Supplier",lines:[{id:"one",itemId:32,itemNo:"SKU32",name:"Item",unit:"PCS",quantity:2,unitPrice:100,discountPercent:5,taxPercent:0,taxBasePercent:100,warehouse:"Utama",notes:"Note"}]});
+const payload=()=>({...emptyTransaction(),sqDetails:{subject:"",pic:"",validity:"",delivery:"",installation:"",warranty:"",franco:"",pricingReviewed:true},date:"2026-09-25",partnerId:17,partnerNo:"V-17",partnerName:"Supplier",lines:[{id:"one",itemId:32,itemNo:"SKU32",name:"Item",unit:"PCS",quantity:2,unitPrice:100,discountPercent:5,taxPercent:0,taxBasePercent:100,warehouse:"Utama",notes:"Note"}]});
 function approved(store:DraftStore,kind:"PO"|"SO"="PO") {
   let d=store.create(admin,{kind:kind==="SO"?"SQ":"PO",payload:payload()});
   d=store.transition(admin,d.id,{version:d.version,action:"submit"});
@@ -138,16 +138,22 @@ test("read-back requires the correct reservation marker, partner, item and amoun
   } finally {globalThis.fetch=original;for(const key of ["ACCURATE_SIGNATURE_KEY","ACCURATE_API_TOKEN"])if(old[key]===undefined)delete process.env[key];else process.env[key]=old[key];store.close();}
 });
 
-test("sales publishes SQ without head approval; heads select it and notes stay local",async()=>{
+test("only Super Admin publishes an approved SQ; sales requests and internal SO notes stay local",async()=>{
   const store=new DraftStore(":memory:");
   const sales:Actor={...admin,userId:"sales",role:"sales",teamId:"sales"};
   const headSales:Actor={...sales,userId:"head-sales",role:"head_sales"};
   try {
     const p=payload();p.internalNotes="PRIVATE negotiation limit";
-    const draft=store.create(sales,{kind:"SQ",payload:p});
+    let draft=store.create(sales,{kind:"SQ",payload:{...p,sqDetails:undefined,lines:p.lines.map(l=>({...l,unitPrice:0,discountPercent:0,warehouse:""}))}});
     assert.throws(()=>store.transition(headSales,draft.id,{version:1,action:"promote"}),{code:"SQ_NOT_PUBLISHED"});
     let calls=0;
-    const sq=await publishOrder(sales,draft.id,1,{store,preflight,verify,create:async(_company,kind,params)=>{
+    await assert.rejects(publishOrder(sales,draft.id,draft.version,{store,preflight}),{code:"FORBIDDEN"});
+    draft=store.update(headSales,draft.id,{version:draft.version,payload:p});
+    draft=store.transition(headSales,draft.id,{version:draft.version,action:"submit"});
+    assert.throws(()=>store.transition(headSales,draft.id,{version:draft.version,action:"approve"}),{code:"FORBIDDEN"});
+    await assert.rejects(publishOrder(admin,draft.id,draft.version,{store,preflight}),{code:"PUBLICATION_STATUS"});
+    draft=store.transition(admin,draft.id,{version:draft.version,action:"approve"});
+    const sq=await publishOrder(admin,draft.id,draft.version,{store,preflight,verify,create:async(_company,kind,params)=>{
       calls++;assert.equal(kind,"SQ");
       assert.equal(params["detailItem[0].warehouseName"],undefined);assert.equal(params.rate,undefined);
       assert.equal(JSON.stringify(params).includes("PRIVATE"),false);

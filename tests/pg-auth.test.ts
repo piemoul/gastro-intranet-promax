@@ -129,6 +129,19 @@ test("PostgreSQL authentication persists and enforces production invariants",{sk
         assert.ok(await other.actor(token));
       }finally{await scoped`DROP TRIGGER intranet_test_audit_failure ON intranet_user_audit`;}
     });
+    await context.test("Portal sync grants explicit Super Admin, revokes sessions and preserves Google identities",async()=>{
+      const grant={id:"portal:5",email:"dondy.i@gastro.co.id",name:"Directory Admin",role:"master_admin" as const,companyIds:[1,2,3] as (1|2|3)[],active:true};
+      await store.syncDirectory([grant]);
+      const bound=await store.authenticateIdentity(identity(grant.email,"directory-google-sub"));
+      const token=await store.createSession(bound),actor=(await store.actor(token))!;
+      assert.equal(actor.role,"master_admin");assert.equal((await store.list(actor)).some(u=>u.id===grant.id),true);
+      await store.syncDirectory([grant]);assert.ok(await store.actor(token));
+      await store.syncDirectory([{...grant,active:false}]);assert.equal(await store.actor(token),null);
+      await store.syncDirectory([grant]);await assert.rejects(store.authenticateIdentity(identity(grant.email,"new-sub")));
+      await store.syncDirectory([{...grant,email:"reassigned@example.com"}]);
+      assert.equal((await store.byEmail(grant.email))?.active,false);assert.equal(await store.byEmail("reassigned@example.com"),null);
+      assert.equal((await store.byEmail(MASTER_ADMIN_EMAIL))?.active,true);
+    });
   }finally{
     await connection`DROP SCHEMA IF EXISTS ${connection(schema)} CASCADE`;
     await connection.end({timeout:5});

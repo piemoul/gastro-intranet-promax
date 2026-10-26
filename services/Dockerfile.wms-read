@@ -1,0 +1,6 @@
+FROM node:24-bookworm-slim
+WORKDIR /app
+RUN npm install --omit=dev --ignore-scripts postgres@3.4.9
+COPY services/wms-read-api.mjs ./
+USER node
+CMD ["node", "wms-read-api.mjs"]

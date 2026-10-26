@@ -54,6 +54,8 @@ export function assertTransition(actor:Actor,draft:Draft,action:DraftAction,reas
     return;
   }
   assertUnpublished(draft);
+  if(action==="approve"&&draft.kind==="SQ"&&actor.role!=="master_admin")throw new WorkflowError("FORBIDDEN","SQ harus disetujui Super Admin.",403);
+  if(action==="approve"&&draft.kind==="SQ"&&draft.payload.type==="transaction"&&!draft.payload.sqDetails?.pricingReviewed)throw new WorkflowError("SQ_REVIEW_REQUIRED","Admin harus meninjau harga dan melengkapi pemetaan barang sebelum persetujuan SQ.",409);
   if (action === "submit") {
     assertEdit(actor,draft);
     if (!["DRAFT","REVISION"].includes(draft.status)) throw new WorkflowError("INVALID_TRANSITION", "Hanya draft atau dokumen revisi yang dapat diajukan.",409);
@@ -72,8 +74,10 @@ export function assertUnpublished(draft:Draft) {
 export function assertPublish(actor:Actor,draft:Draft) {
   assertDraftAccess(actor,draft);
   if (draft.kind==="SQ" && !draft.source && !draft.quotation) {
-    if (!isHeadForKind(actor,"SQ") && !(actor.role==="sales"&&actor.userId===draft.ownerId)) throw new WorkflowError("FORBIDDEN","Hanya pemilik SQ atau kepala sales yang dapat menyimpan SQ ke Accurate.",403);
-    assertUnpublished(draft); return;
+    if (actor.role!=="master_admin") throw new WorkflowError("FORBIDDEN","Hanya Super Admin yang dapat menerbitkan SQ yang telah disetujui.",403);
+    assertUnpublished(draft);
+    if(draft.status!=="APPROVED"||!draft.approvedBy||draft.approvalPolicy!=="SQ_SUPER_ADMIN_V1")throw new WorkflowError("PUBLICATION_STATUS","SQ harus disetujui Super Admin sebelum dibuat di Accurate.",409);
+    return;
   }
   if (!isHeadForKind(actor,draft.kind)) throw new WorkflowError("FORBIDDEN","Hanya kepala bagian terkait atau master admin yang dapat membuat dokumen Accurate.",403);
   if (!["PO","SO"].includes(draft.kind) || draft.source) throw new WorkflowError("PUBLICATION_KIND","Hanya PO/SO internal baru yang dapat dibuat di Accurate. Usulan perubahan dokumen Accurate tetap lokal.",409);

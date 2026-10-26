@@ -9,15 +9,17 @@ const customFields = z.record(z.string().min(1).max(100), z.string().max(2000)).
 const date = z.string().refine(value => value === "" || (/^\d{4}-\d{2}-\d{2}$/.test(value) && !Number.isNaN(Date.parse(value)) && new Date(value).toISOString().slice(0, 10) === value), "Tanggal tidak valid.");
 
 export const transactionLineSchema = z.object({
-  id: z.string().min(1).max(100), itemId: z.number().int().positive().max(Number.MAX_SAFE_INTEGER),
+  id: z.string().min(1).max(100), itemId: z.number().int().min(0).max(Number.MAX_SAFE_INTEGER),
   itemNo: text, name: text, unit: text, quantity: z.number().finite().min(0).max(1_000_000_000),
   unitPrice: amount, discountPercent: percent, taxPercent: percent, taxBasePercent:percent.default(100), warehouse: text, notes: note,
   project:text.optional().default(""), department:text.optional().default(""), customFields:customFields.optional().default({}),
   sourceLineId:z.number().int().positive().max(Number.MAX_SAFE_INTEGER).optional(),
-}).strict();
+  entrySource:z.object({kind:z.enum(["wms","custom"]),wmsId:z.string().max(100).optional(),brand:text,model:text}).strict().optional(),
+}).strict().refine(l=>l.itemId>0||l.entrySource?.kind==="custom","ID Accurate wajib kecuali barang custom yang belum dipetakan.");
 
 export const transactionPayloadSchema = z.object({
   type: z.literal("transaction"), internalNotes:note.optional().default(""), date, partnerId: z.number().int().min(0).max(Number.MAX_SAFE_INTEGER),
+  sqDetails:z.object({subject:text,pic:text,validity:text,delivery:note,installation:note,warranty:note,franco:text,pricingReviewed:z.boolean()}).strict().optional(),
   partnerNo: text, partnerName: text, currency: z.string().regex(/^[A-Z]{3}$/, "Gunakan kode mata uang tiga huruf."),
   exchangeRate: z.number().finite().positive().max(1_000_000_000), branch: text, paymentTerm: text,
   shipDate: date, address: note, reference: text, salesperson: text, description: note,
@@ -48,6 +50,7 @@ export const accurateSourceSchema = z.object({ kind:z.enum(["PO", "SQ", "SO", "I
 /** Partial drafts may omit business values but never allow malformed IDs or unsafe numeric values. */
 export function parseDraftPayload(kind: DraftKind, input: unknown): DraftPayload {
   const payload = kind.startsWith("ITEM") ? itemPayloadSchema.parse(input) : kind.startsWith("CUSTOMER") ? customerPayloadSchema.parse(input) : transactionPayloadSchema.parse(input);
+  if(kind!=="SQ"&&payload.type==="transaction"&&payload.lines.some(l=>l.itemId===0))throw new z.ZodError([{code:"custom",path:["lines"],message:"Barang belum memiliki ID Accurate."}]);
   if (kind === "ITEM_EDIT" && payload.type === "item" && !payload.itemId) throw new z.ZodError([{ code:"custom", path:["itemId"], message:"Pilih barang Accurate untuk perubahan master." }]);
   if (kind === "ITEM_CREATE" && payload.type === "item" && payload.itemId) throw new z.ZodError([{ code:"custom", path:["itemId"], message:"Draft barang baru tidak boleh menggunakan ID barang lama." }]);
   if (kind === "CUSTOMER_EDIT" && payload.type === "customer" && !payload.customerId) throw new z.ZodError([{code:"custom",path:["customerId"],message:"Pilih klien Accurate untuk perubahan master."}]);
@@ -65,6 +68,7 @@ export function validateCompletePayload(kind: DraftKind, input: unknown): DraftP
     requireText(payload.partnerName,["partnerName"],"Nama pelanggan atau pemasok diperlukan.");
     if (!payload.lines.length) issues.push({code:"custom",path:["lines"],message:"Tambahkan minimal satu barang Accurate."});
     payload.lines.forEach((line,index) => {
+      if(!line.itemId)issues.push({code:"custom",path:["lines",index,"itemId"],message:"Petakan barang custom ke SKU Accurate yang sudah ada sebelum persetujuan."});
       requireText(line.itemNo,["lines",index,"itemNo"],"Kode barang diperlukan.");
       requireText(line.name,["lines",index,"name"],"Nama barang diperlukan.");
       requireText(line.unit,["lines",index,"unit"],"Satuan diperlukan.");
@@ -82,6 +86,13 @@ export function validateCompletePayload(kind: DraftKind, input: unknown): DraftP
   }
   if (issues.length) throw new z.ZodError(issues);
   return payload;
+}
+
+/** Sales submits an item request; commercial completion belongs to the reviewer. */
+export function validateSQEntry(input:unknown):DraftPayload {
+  const p=transactionPayloadSchema.parse(input);
+  if(!p.date||!p.partnerId||!p.lines.length||p.lines.some(l=>!l.name||!l.unit||l.quantity<=0))throw new z.ZodError([{code:"custom",path:["lines"],message:"Lengkapi tanggal, klien, nama barang, satuan dan jumlah sebelum mengajukan review."}]);
+  return p;
 }
 
 export function parseAccurateSource(kind:DraftKind, input:unknown):AccurateSource {

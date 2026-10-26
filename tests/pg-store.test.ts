@@ -13,6 +13,7 @@ const databaseUrl = process.env.INTRANET_TEST_DATABASE_URL;
 const actor = (role: Role, userId = role as string, companyId: 1 | 2 = 1): Actor => ({ userId, name: userId, role, companyId, companyIds: [1, 2], teamId: role === "master_admin" ? "all" : role === "sales" || role === "head_sales" ? "sales" : "importer" });
 const sales = actor("sales"), head = actor("head_sales"), importer = actor("importer"), headImporter = actor("head_importer"), admin = actor("master_admin");
 function payload(): TransactionPayload { return { ...emptyTransaction(), date: "2026-09-24", partnerId: 17, partnerNo: "C-17", partnerName: "Verification fixture", lines: [{ id: "line-one", itemId: 32, itemNo: "I-32", name: "Fixture item", unit: "PCS", quantity: 2, unitPrice: 100, discountPercent: 0, taxPercent: 12, taxBasePercent: 91.666667, warehouse: "Utama", notes: "" }] }; }
+function entryPayload():TransactionPayload {const p=payload();return {...p,lines:p.lines.map(l=>({...l,unitPrice:0,taxPercent:0,taxBasePercent:100,warehouse:""}))};}
 const code = (expected: string) => (error: unknown) => error instanceof WorkflowError && error.code === expected;
 
 function scopedSql(url: string, schema: string): Sql {
@@ -39,7 +40,7 @@ test("PostgreSQL persistence, permissions, concurrency and rollback in an isolat
     const sql = firstSql;
 
     await t.test("permissions, company boundary and master-created business teams", async () => {
-      const draft = await first.create(sales, { kind: "SQ", payload: payload() });
+      const draft = await first.create(sales, { kind: "SQ", payload: entryPayload() });
       for (const unauthorized of [actor("sales", "another-sales"), { ...head, teamId: "other-team" }, importer, headImporter, { ...head, companyId: 2 as const }]) {
         assert.equal((await first.list(unauthorized)).some(row => row.id === draft.id), false);
         await assert.rejects(first.get(unauthorized, draft.id), code("FORBIDDEN"));
@@ -57,29 +58,32 @@ test("PostgreSQL persistence, permissions, concurrency and rollback in an isolat
     await t.test("concurrent create retries share one durable draft, sequence and audit", async () => {
       const original = { ...payload(), customFields: { charField2: "Second", charField1: "First" } };
       const [a, b] = await Promise.all([
-        first.create(sales, { kind: "SQ", payload: original, requestId: "concurrent-create" }),
-        second.create(sales, { kind: "SQ", payload: { ...original, customFields: { charField1: "First", charField2: "Second" } }, requestId: "concurrent-create" }),
+        first.create(head, { kind: "SQ", payload: original, requestId: "concurrent-create" }),
+        second.create(head, { kind: "SQ", payload: { ...original, customFields: { charField1: "First", charField2: "Second" } }, requestId: "concurrent-create" }),
       ]);
       assert.deepEqual(a, b); assert.equal((await first.audit(head, a.id)).length, 1);
-      await assert.rejects(second.create(sales, { kind: "SQ", payload: { ...original, reference: "changed" }, requestId: "concurrent-create" }), code("IDEMPOTENCY_CONFLICT"));
-      const otherCompany = await first.create({ ...sales, companyId: 2 }, { kind: "SQ", payload: original, requestId: "concurrent-create" });
+      await assert.rejects(second.create(head, { kind: "SQ", payload: { ...original, reference: "changed" }, requestId: "concurrent-create" }), code("IDEMPOTENCY_CONFLICT"));
+      const otherCompany = await first.create({ ...head, companyId: 2 }, { kind: "SQ", payload: original, requestId: "concurrent-create" });
       assert.notEqual(otherCompany.id, a.id);
       const results = await Promise.allSettled([
-        first.update(sales, a.id, { version: 1, payload: { ...original, reference: "race-a" } }),
-        second.update(sales, a.id, { version: 1, payload: { ...original, reference: "race-b" } }),
+        first.update(head, a.id, { version: 1, payload: { ...original, reference: "race-a" } }),
+        second.update(head, a.id, { version: 1, payload: { ...original, reference: "race-b" } }),
       ]);
       assert.equal(results.filter(result => result.status === "fulfilled").length, 1);
       const rejected = results.find(result => result.status === "rejected"); assert.ok(rejected?.status === "rejected" && code("VERSION_CONFLICT")(rejected.reason));
-      const current = await second.get(sales, a.id); assert.equal(current.version, 2); assert.equal((await second.audit(sales, a.id)).length, 2);
-      assert.deepEqual(await first.create(sales, { kind: "SQ", payload: original, requestId: "concurrent-create" }), current);
+      const current = await second.get(head, a.id); assert.equal(current.version, 2); assert.equal((await second.audit(head, a.id)).length, 2);
+      assert.deepEqual(await first.create(head, { kind: "SQ", payload: original, requestId: "concurrent-create" }), current);
     });
 
     await t.test("approval, atomic edits, lineage and concurrent promotion parity", async () => {
-      const draft = await first.create(sales, { kind: "SQ", payload: payload() });
+      const draft = await first.create(sales, { kind: "SQ", payload: entryPayload() });
       const submitted = await first.transition(sales, draft.id, { version: 1, action: "submit" });
       await assert.rejects(first.transition(sales, draft.id, { version: 2, action: "approve" }), code("FORBIDDEN"));
-      let approved = await second.transition(head, draft.id, { version: submitted.version, action: "approve" });
-      approved=await first.reservePublication(head,approved.id,approved.version);
+      const reviewed = await first.update(head,draft.id,{version:submitted.version,payload:{...payload(),sqDetails:{subject:"",pic:"",validity:"",delivery:"",installation:"",warranty:"",franco:"",pricingReviewed:true}}});
+      const ready=await first.transition(head,draft.id,{version:reviewed.version,action:"submit"});
+      await assert.rejects(second.transition(head,draft.id,{version:ready.version,action:"approve"}),code("FORBIDDEN"));
+      let approved = await second.transition(admin, draft.id, { version: ready.version, action: "approve" });
+      approved=await first.reservePublication(admin,approved.id,approved.version);
       approved=await first.completePublication(head,approved.id,approved.publication!.attemptId,{outcome:"published",id:79,number:"SQ079"});
       const attempts = await Promise.allSettled([
         first.transition(head, draft.id, { version: approved.version, action: "promote" }),
@@ -139,17 +143,17 @@ test("PostgreSQL persistence, permissions, concurrency and rollback in an isolat
     });
 
     await t.test("append-only audit and atomic rollback leave no partial draft or consumed request", async () => {
-      const draft = await first.create(sales, { kind: "SQ", payload: payload() });
+      const draft = await first.create(sales, { kind: "SQ", payload: entryPayload() });
       await assert.rejects(sql`UPDATE intranet_draft_audit SET entry='{}'::jsonb WHERE draft_id=${draft.id}`, /append-only/);
       await assert.rejects(sql`DELETE FROM intranet_draft_audit WHERE draft_id=${draft.id}`, /append-only/);
       await assert.rejects(sql`TRUNCATE intranet_draft_audit`, /append-only/);
       await sql`CREATE FUNCTION intranet_test_reject_audit() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN RAISE EXCEPTION 'Fixture audit rejection'; END; $$`;
       await sql`CREATE TRIGGER intranet_test_reject_audit BEFORE INSERT ON intranet_draft_audit FOR EACH ROW EXECUTE FUNCTION intranet_test_reject_audit()`;
-      await assert.rejects(first.update(sales, draft.id, { version: 1, payload: { ...payload(), reference: "must rollback" } }), /Fixture audit rejection/);
-      await assert.rejects(first.create(sales, { kind: "SQ", payload: payload(), requestId: "retry-after-failure" }), /Fixture audit rejection/);
+      await assert.rejects(first.update(sales, draft.id, { version: 1, payload: { ...entryPayload(), description: "must rollback" } }), /Fixture audit rejection/);
+      await assert.rejects(first.create(sales, { kind: "SQ", payload: entryPayload(), requestId: "retry-after-failure" }), /Fixture audit rejection/);
       await sql`DROP TRIGGER intranet_test_reject_audit ON intranet_draft_audit`;
       assert.deepEqual(await first.get(sales, draft.id), draft); assert.equal((await first.audit(sales, draft.id)).length, 1);
-      const retry = await second.create(sales, { kind: "SQ", payload: payload(), requestId: "retry-after-failure" });
+      const retry = await second.create(sales, { kind: "SQ", payload: entryPayload(), requestId: "retry-after-failure" });
       assert.equal((await first.audit(sales, retry.id)).length, 1);
       assert.equal(Number(retry.number.split("-").at(-1)), Number(draft.number.split("-").at(-1)) + 1);
     });

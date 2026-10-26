@@ -39,6 +39,7 @@ export function UsersView() {
   const [refresh, setRefresh] = useState(0),
     [search, setSearch] = useState(""),
     [editing, setEditing] = useState<UserRecord | "new" | null>(null);
+  const [syncing,setSyncing]=useState(false),[syncError,setSyncError]=useState("");
   const { data, error, loading } = useResource<{
     items: UserRecord[];
     masterAdminEmail: string;
@@ -75,6 +76,8 @@ export function UsersView() {
         </div>
       </div>
       <section className="panel list-panel">
+        <div className="list-toolbar"><div><strong>Direktori sales Gastro Portal</strong><p className="fine-print">Baserow menentukan kelayakan sales dan PT. Akun Portal dikelola melalui sumbernya. Whitelist admin sales ditambahkan terpisah.</p></div><button className="button button-secondary" disabled={syncing} onClick={async()=>{setSyncing(true);setSyncError("");try{await post("/api/users/sync-portal",{});setRefresh(n=>n+1);}catch(e){setSyncError((e as Error).message);}finally{setSyncing(false);}}}>{syncing?"Memverifikasi Portal…":"Sinkronkan Portal"}</button></div>
+        {syncError&&<Notice error>{syncError}</Notice>}
         <div className="list-toolbar">
           <SearchField
             value={search}
@@ -138,7 +141,7 @@ export function UsersView() {
                       </span>
                     </td>
                     <td>
-                      {user.role !== "master_admin" ? (
+                      {user.role !== "master_admin" && !user.id.startsWith("portal:") ? (
                         <button
                           className="icon-button"
                           aria-label={`Edit ${user.name}`}

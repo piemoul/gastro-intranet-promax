@@ -5,6 +5,7 @@ import path from "node:path";
 import { createHash, randomBytes, randomUUID } from "node:crypto";
 import { z } from "zod";
 import type { Actor, CompanyId, Role } from "@/lib/domain";
+import type { DirectoryGrant } from "./portal-policy";
 
 export const MASTER_ADMIN_EMAIL = "malesmikirbos@gmail.com";
 export const SESSION_COOKIE = "intranet_session";
@@ -44,12 +45,34 @@ export class UserStore {
   close(){this.db.close();}
   byEmail(email:string) {const row=this.db.prepare("SELECT * FROM users WHERE email=?").get(email.toLowerCase().trim()) as Row|undefined;return row?userFromRow(row):null;}
   byId(id:string) {const row=this.db.prepare("SELECT * FROM users WHERE id=?").get(id) as Row|undefined;return row?userFromRow(row):null;}
-  assertAdmin(actor:Actor){const u=this.byId(actor.userId);if(!u?.active||u.role!=="master_admin"||u.email!==MASTER_ADMIN_EMAIL)throw new AuthError("Hanya master admin yang dapat mengelola pengguna.");}
+  assertAdmin(actor:Actor){const u=this.byId(actor.userId);if(!u?.active||u.role!=="master_admin")throw new AuthError("Hanya Super Admin yang dapat mengelola pengguna.");}
+  syncDirectory(grants:DirectoryGrant[]){
+    this.db.exec("BEGIN IMMEDIATE");
+    try{
+      const previous=(this.db.prepare("SELECT * FROM users WHERE id LIKE 'portal:%'").all() as Row[]).map(userFromRow);
+      const desired=new Map(grants.map(g=>[g.id,g]));
+      for(const old of previous){
+        const g=desired.get(old.id);
+        if(!g||g.email!==old.email)desired.set(old.id,{...old,active:false});
+      }
+      for(const g of desired.values()){
+        const old=this.byId(g.id),collision=this.byEmail(g.email);
+        if(collision&&collision.id!==g.id)continue; // Never adopt/rebind a manually managed identity.
+        const team=g.role==="master_admin"?"all":"sales";
+        if(old&&old.name===g.name&&old.role===g.role&&JSON.stringify(old.companyIds)===JSON.stringify(g.companyIds)&&old.active===g.active)continue;
+        this.db.prepare("INSERT INTO users (id,email,name,role,companies,team,active) VALUES (?,?,?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET name=excluded.name,role=excluded.role,companies=excluded.companies,team=excluded.team,active=excluded.active").run(g.id,g.email,g.name,g.role,JSON.stringify(g.companyIds),team,Number(g.active));
+        this.db.prepare("DELETE FROM sessions WHERE user_id=?").run(g.id);
+        this.db.prepare("INSERT INTO user_audit VALUES (?,?,?,?,?,?,?)").run(randomUUID(),"gastro-portal","directory_sync",g.id,JSON.stringify(old),JSON.stringify(this.byId(g.id)),new Date().toISOString());
+      }
+      this.db.exec("COMMIT");
+    }catch(error){this.db.exec("ROLLBACK");throw error;}
+  }
   list(actor:Actor){this.assertAdmin(actor);return(this.db.prepare("SELECT * FROM users ORDER BY role='master_admin' DESC,name").all() as Row[]).map(userFromRow);}
   save(actor:Actor,raw:unknown,id?:string){
     this.assertAdmin(actor);const old=id?this.byId(id):null;
     if(id&&!old)throw new AuthError("Pengguna tidak ditemukan.",404);
     if(old?.email===MASTER_ADMIN_EMAIL)throw new AuthError("Akun master admin tidak dapat diubah atau dinonaktifkan.");
+    if(old?.id.startsWith("portal:"))throw new AuthError("Identitas ini dikelola melalui direktori Gastro Portal.");
     const parsed=id?{...userUpdate.parse(raw),email:old!.email}:userInput.parse(raw);
     if(parsed.email===MASTER_ADMIN_EMAIL)throw new AuthError("Email master admin sudah terdaftar.",409);
     if(!id&&this.byEmail(parsed.email))throw new AuthError("Email sudah ada dalam whitelist.",409);

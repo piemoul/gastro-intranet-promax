@@ -12,16 +12,17 @@ import { emptyCustomer, emptyTransaction, type Draft, type Role, type Transactio
 
 test("authenticated API integration uses isolated databases and allowlisted read-only fixtures", async context => {
   const originalFetch=globalThis.fetch;
-  const envKeys=["DATABASE_URL","INTRANET_DATA_DIR","INTRANET_WMS_ENV_FILE","APP_URL","ACCURATE_HOST","ACCURATE_SIGNATURE_KEY","ACCURATE_API_TOKEN","ACCURATE_API_TOKEN_RSP","ACCURATE_API_TOKEN_SARANA"] as const;
+  const envKeys=["DATABASE_URL","INTRANET_DATA_DIR","INTRANET_WMS_ENV_FILE","APP_URL","INTRANET_WMS_API_URL","INTRANET_WMS_API_KEY","INTRANET_PORTAL_API_URL","ACCURATE_HOST","ACCURATE_SIGNATURE_KEY","ACCURATE_API_TOKEN","ACCURATE_API_TOKEN_RSP","ACCURATE_API_TOKEN_SARANA"] as const;
   const savedEnv=Object.fromEntries(envKeys.map(key=>[key,process.env[key]]));
   const dir=mkdtempSync(join(tmpdir(),"intranet-api-"));
-  Object.assign(process.env,{DATABASE_URL:"",INTRANET_DATA_DIR:dir,INTRANET_WMS_ENV_FILE:"",APP_URL:"http://localhost:3100",ACCURATE_HOST:"https://fixtures.accurate.id",ACCURATE_SIGNATURE_KEY:"local-fixture-signature",ACCURATE_API_TOKEN:"fixture-company-1",ACCURATE_API_TOKEN_RSP:"fixture-company-2",ACCURATE_API_TOKEN_SARANA:"fixture-company-3"});
+  Object.assign(process.env,{DATABASE_URL:"",INTRANET_PORTAL_API_URL:"",INTRANET_WMS_API_URL:"http://localhost:3110/v1/catalog",INTRANET_WMS_API_KEY:"fixture-wms-reference-key-32-chars",INTRANET_DATA_DIR:dir,INTRANET_WMS_ENV_FILE:"",APP_URL:"http://localhost:3100",ACCURATE_HOST:"https://fixtures.accurate.id",ACCURATE_SIGNATURE_KEY:"local-fixture-signature",ACCURATE_API_TOKEN:"fixture-company-1",ACCURATE_API_TOKEN_RSP:"fixture-company-2",ACCURATE_API_TOKEN_SARANA:"fixture-company-3"});
   const reads:{path:string;method:string;company:number}[]=[];
   const item={id:32,no:"SKU-32",name:"Fixture Refrigerator",itemBrand:{name:"Fixture Brand"},charField1:"Model 32",itemType:"INVENTORY",unit1:{name:"PCS"},unit2:{name:"BOX"},ratio2:2,suspended:false,unitPrice:100};
   const customer={id:17,customerNo:"C-017",name:"Fixture Customer",email:"customer@example.com",currency:{code:"IDR"},suspended:false};
   const order={id:80,number:"SO-080",transDate:"24/09/2026",customer,currency:{code:"IDR"},rate:1,taxable:true,inclusiveTax:false,percentTaxable:100,tax1Rate:11,detailItem:[{id:90,item,itemUnit:{name:"PCS"},quantity:2,unitPrice:100,useTax1:true,itemDiscPercent:0,totalPrice:200}],totalAmount:222};
   globalThis.fetch=async(input,init)=>{
     const url=new URL(typeof input==="string"?input:input instanceof URL?input.href:input.url);
+    if(url.origin==="http://localhost:3110"){assert.equal(Number(url.searchParams.get("companyId")),1);return Response.json({companyId:1,brands:["Fixture Brand"],models:["Model 32"],page:1,hasMore:false,fetchedAt:new Date().toISOString(),items:[{id:"wms-32",code:item.no,name:item.name,brand:"Fixture Brand",model:"Model 32",unit:"PCS",classification:"unique",stock:[],available:0}]});}
     assert.equal(url.origin,"https://fixtures.accurate.id","Only the local Accurate fixture transport may be requested.");
     const method=init?.method||"GET";
     assert.equal(method,"GET","No Accurate mutation is permitted in API tests.");
@@ -64,7 +65,7 @@ test("authenticated API integration uses isolated databases and allowlisted read
     const workStore={isStaticGeneration:false,page:"/api/[...path]/route",route:"/api/[...path]"} as WorkStore;
     return workAsyncStorage.run(workStore,()=>workUnitAsyncStorage.run(requestStore,()=>route[method](req,{params:Promise.resolve({path:req.nextUrl.pathname.slice("/api/".length).split("/")})})));
   }
-  const transaction=():TransactionPayload=>({...emptyTransaction(),date:"2026-09-24",partnerId:17,partnerNo:"C-017",partnerName:"untrusted browser label",lines:[{id:"local-line",itemId:32,itemNo:"SKU-32",name:"Fixture Refrigerator",unit:"PCS",quantity:2,unitPrice:100,discountPercent:0,taxPercent:11,warehouse:"Utama",notes:""}]});
+  const transaction=():TransactionPayload=>({...emptyTransaction(),date:"2026-09-24",partnerId:17,partnerNo:"C-017",partnerName:"untrusted browser label",lines:[{id:"local-line",itemId:32,itemNo:"SKU-32",name:"Fixture Refrigerator",unit:"PCS",quantity:2,unitPrice:0,discountPercent:0,taxPercent:0,warehouse:"",notes:"",entrySource:{kind:"wms",wmsId:"wms-32",brand:"Fixture Brand",model:"Model 32"}}]});
   let ownDraft:Draft;
   try {
     await context.test("unauthenticated calls reject and CSRF checks run before mutations or network",async()=>{
@@ -174,11 +175,11 @@ test("authenticated API integration uses isolated databases and allowlisted read
       const retry=await request("POST","drafts",tokens.sales,input);
       assert.equal(retry.status,201); assert.equal((await retry.json()).draft.id,draft.id);
       assert.equal((await store.audit(admin,draft.id)).length,1);
-      assert.equal((await request("POST","drafts",tokens.sales,{...input,payload:{...input.payload,reference:"different"}})).status,409);
+      assert.equal((await request("POST","drafts",tokens.sales,{...input,payload:{...input.payload,description:"different"}})).status,409);
       const before=reads.length;
       assert.equal((await request("PUT",`drafts/${draft.id}`,tokens.other_sales,{version:1,payload:transaction()})).status,403);
       assert.equal(reads.length,before);
-      const updated=await request("PUT",`drafts/${draft.id}`,tokens.sales,{version:1,payload:{...transaction(),reference:"local change"}});
+      const updated=await request("PUT",`drafts/${draft.id}`,tokens.sales,{version:1,payload:{...transaction(),description:"local change"}});
       assert.equal(updated.status,200); assert.equal((await updated.json()).draft.version,2);
       assert.equal((await request("PUT",`drafts/${draft.id}`,tokens.sales,{version:1,payload:transaction()})).status,409);
       const invalid=transaction(); invalid.lines[0].itemNo="FORGED-CODE";
@@ -238,8 +239,10 @@ test("authenticated API integration uses isolated databases and allowlisted read
     });
 
     await context.test("final publish API requires confirmation, head access, CSRF and the approved version",async()=>{
-      const p=transaction();p.lines[0].taxPercent=0;p.lines[0].warehouse="Utama";
+      const p=transaction();p.lines[0].taxPercent=0;p.lines[0].unitPrice=100;p.lines[0].warehouse="Utama";p.sqDetails={subject:"",pic:"",validity:"",delivery:"",installation:"",warranty:"",franco:"",pricingReviewed:true};
       let d=await store.create(admin,{kind:"SQ",payload:p});
+      d=await store.transition(admin,d.id,{version:d.version,action:"submit"});
+      d=await store.transition(admin,d.id,{version:d.version,action:"approve"});
       d=await store.reservePublication(admin,d.id,d.version);
       d=await store.completePublication(admin,d.id,d.publication!.attemptId,{outcome:"published",id:79,number:"SQ079"});
       for(const action of ["promote","submit","approve"] as const)d=await store.transition(admin,d.id,{version:d.version,action});

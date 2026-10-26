@@ -4,6 +4,7 @@ import { z } from "zod";
 import type { Actor, CompanyId, Role } from "@/lib/domain";
 import { ensureSchema, getSql } from "../postgres";
 import { AuthError, MASTER_ADMIN_EMAIL, SESSION_AGE, userInput, userUpdate, type WhitelistedUser } from "./users";
+import type { DirectoryGrant } from "./portal-policy";
 
 type Row={id:string;email:string;name:string;role:Role;companies:CompanyId[];team:string;active:boolean;google_sub:string|null};
 type Identity={email:string;sub:string;emailVerified:boolean;authoritative:boolean};
@@ -69,6 +70,31 @@ export class PgUserStore {
       await tx`CREATE TRIGGER intranet_users_no_truncate BEFORE TRUNCATE ON intranet_users FOR EACH STATEMENT EXECUTE FUNCTION intranet_reject_user_truncate()`;
     },this.sql);
   }
+  async syncDirectory(grants:DirectoryGrant[]){
+    await this.ready();
+    await ensureSchema("auth-v3-portal-super-admin",async tx=>{
+      await tx`ALTER TABLE intranet_users DROP CONSTRAINT IF EXISTS intranet_master_admin_invariant`;
+      await tx`ALTER TABLE intranet_users ADD CONSTRAINT intranet_master_admin_invariant CHECK (
+        (email='malesmikirbos@gmail.com' AND id='master-admin' AND role='master_admin' AND active AND companies='[1,2,3]'::jsonb AND team='all') OR
+        (email<>'malesmikirbos@gmail.com' AND id<>'master-admin' AND (role<>'master_admin' OR
+          (id='portal:5' AND email='dondy.i@gastro.co.id') OR (id='portal:30' AND email='a.rendy@saranarefrigeratama.co.id') OR (id='portal:38' AND email='yogi.k@gastro.co.id'))))`;
+    },this.sql);
+    await this.sql.begin(async tx=>{
+      await tx`SELECT pg_advisory_xact_lock(hashtext('intranet_portal_directory'))`;
+      const previous=(await tx<Row[]>`SELECT * FROM intranet_users WHERE id LIKE 'portal:%' FOR UPDATE`).map(fromRow);
+      const desired=new Map(grants.map(g=>[g.id,g]));
+      for(const old of previous){const g=desired.get(old.id);if(!g||g.email!==old.email)desired.set(old.id,{...old,active:false});}
+      for(const g of desired.values()){
+        const rows=await tx<Row[]>`SELECT * FROM intranet_users WHERE id=${g.id} OR email=${g.email} FOR UPDATE`;
+        if(rows.some(r=>r.email===g.email&&r.id!==g.id))continue;
+        const old=rows.find(r=>r.id===g.id),team=g.role==="master_admin"?"all":"sales";
+        if(old&&old.name===g.name&&old.role===g.role&&JSON.stringify(old.companies)===JSON.stringify(g.companyIds)&&old.active===g.active)continue;
+        const [after]=await tx<Row[]>`INSERT INTO intranet_users (id,email,name,role,companies,team,active) VALUES (${g.id},${g.email},${g.name},${g.role},${tx.json(g.companyIds)},${team},${g.active}) ON CONFLICT(id) DO UPDATE SET name=excluded.name,role=excluded.role,companies=excluded.companies,team=excluded.team,active=excluded.active RETURNING *`;
+        await tx`DELETE FROM intranet_sessions WHERE user_id=${g.id}`;
+        await this.audit(tx,"gastro-portal","directory_sync",g.id,old?fromRow(old):null,fromRow(after));
+      }
+    });
+  }
   async close(){await this.sql.end({timeout:5});}
   async byEmail(email:string):Promise<WhitelistedUser|null>{
     await this.ready();
@@ -82,7 +108,7 @@ export class PgUserStore {
   }
   async assertAdmin(actor:Actor):Promise<void>{
     const user=await this.byId(actor.userId);
-    if(!user?.active||user.role!=="master_admin"||user.email!==MASTER_ADMIN_EMAIL)throw new AuthError("Hanya master admin yang dapat mengelola pengguna.");
+    if(!user?.active||user.role!=="master_admin")throw new AuthError("Hanya Super Admin yang dapat mengelola pengguna.");
   }
   async list(actor:Actor):Promise<WhitelistedUser[]>{
     await this.assertAdmin(actor);
@@ -99,6 +125,7 @@ export class PgUserStore {
         const old=previous?fromRow(previous):null;
         if(id&&!old)throw new AuthError("Pengguna tidak ditemukan.",404);
         if(old?.email===MASTER_ADMIN_EMAIL)throw new AuthError("Akun master admin tidak dapat diubah atau dinonaktifkan.");
+        if(old?.id.startsWith("portal:"))throw new AuthError("Identitas ini dikelola melalui direktori Gastro Portal.");
         const parsed=id?{...userUpdate.parse(raw),email:old!.email}:userInput.parse(raw);
         if(parsed.email===MASTER_ADMIN_EMAIL)throw new AuthError("Email master admin sudah terdaftar.",409);
         const userId=id||randomUUID(),team=["sales","head_sales"].includes(parsed.role)?"sales":"importer";
