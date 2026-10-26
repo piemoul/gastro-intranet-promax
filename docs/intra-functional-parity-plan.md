@@ -31,7 +31,7 @@ Computer Use memeriksa menu Administration (Users, Roles, Branches, Settings), I
 - [x] SKU & Manage Items, pricebook, settings dan referensi.
 - [x] SQ komersial, revisi/duplikasi, cetak dan laporan.
 - [x] Pembuatan klien khusus Super Admin dengan publikasi guarded.
-- [ ] Tests, deployment, browser QA dan Graphify akhir.
+- [x] Tests, deployment dan browser QA; peta akhir mengikuti artefak Graphify yang dihasilkan.
 
 ## Cara menggunakan Manage Items
 
