@@ -20,7 +20,7 @@ OAuth Google sudah aktif memakai OAuth client **Gastro Intranet** pada project `
 
 Cloudflared yang sudah ada di Docker Desktop menggunakan origin `http://host.docker.internal:3100`. Setelah container aplikasi hidup, domain publik membalas HTTP 200. Konfigurasi tunnel tidak diubah.
 
-Image menjalankan Next.js standalone dengan user non-root, Node.js 24, healthcheck `/login`, serta restart policy `unless-stopped`. WMS `.env` pada mesin dipasang read-only ke `/run/intranet/wms.env`; aplikasi hanya membaca lima variabel integrasi Accurate yang diizinkan dari file itu. Database maupun autentikasi WMS tidak digunakan. Compose secara eksplisit memilih SQLite lokal.
+Image menjalankan Next.js standalone dengan user non-root, Node.js 24, healthcheck `/login`, serta restart policy `unless-stopped`. Lima variabel integrasi Accurate tersedia langsung dalam `.env.local` Intranet dan diteruskan ke environment container. Mount file WMS telah dilepas dan `INTRANET_WMS_ENV_FILE` dikosongkan; runtime tidak bergantung pada file WMS. Database maupun autentikasi WMS tidak digunakan. Compose secara eksplisit memilih SQLite lokal.
 
 ## Arsitektur
 

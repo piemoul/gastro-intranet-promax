@@ -25,7 +25,7 @@ cp .env.example .env.local
 npm run dev
 ```
 
-Buka `http://localhost:3100`. Isi `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, dan `APP_URL` di `.env.local`. Kredensial Accurate lokal dapat dibaca dari `INTRANET_WMS_ENV_FILE` atau disediakan langsung sebagai environment. `DATABASE_URL` hanya diperlukan jika memilih PostgreSQL/Neon. Jangan menaruh rahasia di variabel `NEXT_PUBLIC_*`.
+Buka `http://localhost:3100`. Isi `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `APP_URL`, dan kelima variabel Accurate di `.env.local`. Compose memakai konfigurasi Accurate milik Intranet sendiri tanpa mount file environment WMS. `DATABASE_URL` hanya diperlukan jika memilih PostgreSQL/Neon. Jangan menaruh rahasia di variabel `NEXT_PUBLIC_*`.
 
 Untuk Docker Desktop, setelah mengisi `.env.local`, jalankan `docker compose --env-file .env.local up -d --build app`. Compose memakai SQLite dalam volume persisten. Lihat [environment, OAuth, Accurate, dan operasi Docker](docs/environment.md).
 

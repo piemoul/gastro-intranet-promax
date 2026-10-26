@@ -11,7 +11,7 @@ Salin `.env.example` menjadi `.env.local`, lalu isi nilai pada mesin deployment.
 | `APP_URL` | Origin yang dipakai browser. Deployment ini menggunakan `https://intranet.davay.space`, tanpa trailing slash. |
 | `GOOGLE_CLIENT_ID` | ID OAuth client bertipe Web application. |
 | `GOOGLE_CLIENT_SECRET` | Secret dari OAuth client yang sama. |
-| `INTRANET_WMS_ENV_FILE` | Opsional: path absolut ke file environment WMS yang sudah tersedia. Compose memasangnya read-only; hanya lima key Accurate di bawah yang dibaca. Gunakan slash `/` pada path Windows. |
+| `INTRANET_WMS_ENV_FILE` | Dikosongkan oleh Compose. Container tidak memasang atau membaca file environment WMS. |
 | `ACCURATE_HOST` | Host Accurate yang diizinkan; umumnya `https://iris.accurate.id`. |
 | `ACCURATE_SIGNATURE_KEY` | Key signature integrasi Accurate. |
 | `ACCURATE_API_TOKEN` | Token PT Gastro Gizi Sarana. |
@@ -21,7 +21,9 @@ Salin `.env.example` menjadi `.env.local`, lalu isi nilai pada mesin deployment.
 | `INTRANET_DATA_DIR` | Untuk runtime langsung tanpa PostgreSQL. Compose menetapkannya ke `/app/.data` dalam volume persisten. |
 | `INTRANET_TEST_DATABASE_URL` | Hanya tes PostgreSQL dengan database pengujian khusus. Dikosongkan dalam container aplikasi. |
 
-Untuk Accurate, pilih file WMS yang sudah ada atau isi lima variabel Accurate langsung dalam `.env.local`. Nilai environment langsung didahulukan. Jika path WMS kosong, Compose memasang `.env.example` yang tidak berisi secret sebagai fallback; karena itu file template harus tetap tersedia. Autentikasi dan database WMS tidak dipakai oleh Compose ini.
+Isi kelima variabel Accurate langsung dalam `.env.local`. Compose meneruskannya sebagai environment container dan tidak lagi memasang file WMS maupun file template sebagai fallback. Key yang digunakan telah disalin sekali dari konfigurasi WMS; perubahan file WMS selanjutnya tidak memengaruhi Intranet. Untuk rotasi key, perbarui `.env.local` Intranet dan buat ulang container aplikasi. Autentikasi dan database WMS tidak dipakai oleh Compose ini.
+
+Sesudah pemisahan konfigurasi, container dibuat ulang dan berstatus sehat. Enam pembacaan GET master barang/klien untuk ketiga PT berhasil; image dan volume data tetap sama, file WMS tidak berubah, serta tidak ada transaksi percobaan. Pemeriksaan ini hanya mengambil satu ID per daftar dan tidak menyalin data bisnis ke dokumentasi.
 
 OAuth redirect URI wajib sama persis dengan origin:
 
@@ -58,7 +60,7 @@ Deployment Neon di luar konfigurasi Compose ini memakai objek `intranet_` saja. 
 
 ## Peta Graphify lokal
 
-Graph dan laporan berada di `.graphify/`; cache, manifest mesin, dan file runtime privat tidak dipublikasikan. Graphify 0.17.1 menggunakan runtime TypeScript. Setelah Graphify terpasang:
+Graph dan laporan berada di `.graphify/`; cache, manifest mesin, dan file runtime privat tidak dipublikasikan. `.graphifyignore` mengecualikan file environment, log, data privat, dan artefak graph yang dihasilkan, sambil tetap mengizinkan memory pemetaan tanpa secret. Graphify 0.17.1 menggunakan runtime TypeScript. Setelah Graphify terpasang:
 
 ```powershell
 graphify update . --no-description --no-label

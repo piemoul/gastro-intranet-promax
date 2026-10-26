@@ -1,0 +1,8 @@
+# Never extract private configuration or runtime data.
+.env*
+.logs/**
+.data/**
+
+# Keep generated graph artifacts out of their own corpus.
+.graphify/**
+!.graphify/memory/**
