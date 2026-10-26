@@ -1,6 +1,6 @@
 # Peta proyek dan deployment Docker lokal
 
-Dipetakan dari `ko-indra/gastro-intranet`, branch `main`, commit `b6b29ee` (`Publish quotations to Accurate before selecting sales orders`), kemudian diperbarui untuk revisi UI pada 19 Oktober 2026. Repository tujuan: https://github.com/piemoul/gastro-intranet-promax. Lihat [pemeriksaan UX](ui-responsive-review.md) dan [environment deployment](environment.md).
+Dipetakan dari `ko-indra/gastro-intranet`, branch `main`, commit `b6b29ee` (`Publish quotations to Accurate before selecting sales orders`), kemudian diperbarui untuk revisi UI dan milestone SQ pertama pada 25 Oktober 2026. Repository tujuan: https://github.com/piemoul/gastro-intranet-promax. Lihat [pemeriksaan UX](ui-responsive-review.md) dan [environment deployment](environment.md).
 
 ## Akses dan runtime
 
@@ -20,7 +20,7 @@ OAuth Google sudah aktif memakai OAuth client **Gastro Intranet** pada project `
 
 Cloudflared yang sudah ada di Docker Desktop menggunakan origin `http://host.docker.internal:3100`. Setelah container aplikasi hidup, domain publik membalas HTTP 200. Konfigurasi tunnel tidak diubah.
 
-Image menjalankan Next.js standalone dengan user non-root, Node.js 24, healthcheck `/login`, serta restart policy `unless-stopped`. Lima variabel integrasi Accurate tersedia langsung dalam `.env.local` Intranet dan diteruskan ke environment container. Mount file WMS telah dilepas dan `INTRANET_WMS_ENV_FILE` dikosongkan; runtime tidak bergantung pada file WMS. Database maupun autentikasi WMS tidak digunakan. Compose secara eksplisit memilih SQLite lokal.
+Image menjalankan Next.js standalone dengan user non-root, Node.js 24, healthcheck `/login`, serta restart policy `unless-stopped`. Lima variabel integrasi Accurate tersedia langsung dalam `.env.local` Intranet dan diteruskan ke environment container. Mount file WMS telah dilepas dan `INTRANET_WMS_ENV_FILE` dikosongkan; runtime tidak bergantung pada file WMS. Autentikasi WMS tidak digunakan. Katalog dan stok dibaca melalui layanan API baca tersendiri, tanpa mengubah project WMS live. Compose secara eksplisit memilih SQLite lokal.
 
 ## Arsitektur
 
@@ -42,6 +42,10 @@ flowchart TD
   Reserve --> Create[Create transport: sekali kirim]
   Read --> Accurate[Accurate per PT]
   Create --> Accurate
+  App --> Portal[Gastro Portal API: direktori sales dan katalog]
+  Portal --> Baserow[Baserow Employee Primary]
+  App --> WmsRead[API baca WMS: transaksi READ ONLY]
+  WmsRead --> WmsDB[(Database WMS per PT)]
   Graph[Graphify Studio: localhost 3101] --> Artifacts[Graph dan laporan proyek]
 ```
 
@@ -67,13 +71,15 @@ flowchart TD
 
 Tiga PT: Gastro Gizi Sarana (GGS), Resto Sarana Prima (RSP), dan Sarana Refrigeratama (SRI). Peran aplikasi: sales, kepala sales, importer, kepala importer, dan master admin. Semua endpoint data menerapkan autentikasi serta pembatasan PT/peran/pemilik di server.
 
-- **SQ → SO:** sales menerbitkan SQ lengkap miliknya; kepala sales/admin memilih SQ Accurate; SO lokal disiapkan, disetujui, lalu diterbitkan melalui konfirmasi eksplisit.
+- **SQ → SO:** sales mengajukan barang/jumlah dari katalog WMS, admin melengkapi harga, Super Admin menyetujui dan menerbitkan SQ; kepala sales/admin memilih SQ Accurate; SO lokal disiapkan, disetujui, lalu diterbitkan melalui konfirmasi eksplisit.
 - **PO:** importer menyiapkan draft, kepala importer menyetujui dan menerbitkan PO melalui konfirmasi eksplisit.
 - **Master barang/klien dan edit dokumen Accurate:** perubahan berupa usulan lokal; dokumen/master Accurate yang sudah ada tidak dimutasi.
 - **Keandalan:** versi optimistis, request idempotensi, audit transaksional, satu turunan SO aktif per SQ, serta reservasi sebelum mengirim ke Accurate. `PUBLISHING`, `UNCERTAIN`, dan `PUBLISHED` mengunci perubahan/pengiriman ulang; hasil tidak pasti memerlukan rekonsiliasi baca-saja.
 - **Penyimpanan alternatif:** bila Neon diaktifkan pada deployment lain, objek aplikasi dibatasi awalan `intranet_`; tabel WMS tidak diubah.
 
 Dokumen lama `docs/deployment.md` dan sebagian `docs/accurate-field-matrix.md` masih menyebut semua operasi Accurate GET-only / SQ belum diterbitkan. Kebijakan terkini mengikuti `AGENTS.md`, README, `docs/accurate-publication.md`, dan implementasi yang sudah mendukung create SQ/PO/SO terkontrol. Konflik dokumentasi ini ditandai dalam graph.
+
+Lihat [kontrak milestone SQ pertama](sq-milestone-one.md) untuk whitelist Gastro Portal, tiga Super Admin, sidecar API WMS, stok tanpa reservasi, custom dan kebijakan approval baru.
 
 ## Graphify
 

@@ -1256,20 +1256,20 @@ export function ResearchView() {
           </div>
           <h2>Penjualan</h2>
           <p>
-            Sales menyimpan SQ ke Accurate. Kepala sales memilih SQ untuk SO,
-            melengkapi catatan internal, lalu menyetujui dan membuat SO Accurate.
+            Sales memilih barang dan jumlah dari WMS. Admin melengkapi harga;
+            Super Admin menyetujui dan menerbitkan SQ ke Accurate.
           </p>
           <div className="guide-flow">
             <span>SQ</span>
             <ArrowRight size={16} />
             <span>SQ Accurate</span>
             <ArrowRight size={16} />
-            <span>Dipilih untuk SO</span>
-            <ArrowRight size={16} /><span>Buat SO Accurate</span>
+            <span>Review admin</span>
+            <ArrowRight size={16} /><span>Approval Super Admin</span>
           </div>
           <small>
-            SO yang telah ada di Accurate hanya dapat dibaca dan diusulkan
-            perubahannya.
+            Whitelist sales mengikuti Gastro Portal. Barang custom memerlukan
+            pemetaan ke SKU Accurate sebelum approval.
           </small>
         </section>
         <section className="panel guide-card">
@@ -1331,8 +1331,8 @@ export function ResearchView() {
           menerbitkan PO atau SO ke Accurate.
         </p>
         <p className="fine-print">
-          Pada tahap ini tidak ada fungsi penerbitan Accurate. Field usulan
-          belum menjamin seluruh persyaratan dokumen produksi telah terpenuhi.
+          Penerbitan memakai konfirmasi eksplisit setelah persetujuan. Hasil yang
+          belum pasti dikunci sampai rekonsiliasi pembacaan Accurate.
         </p>
       </section>
     </>
