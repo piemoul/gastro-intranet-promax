@@ -1,0 +1,45 @@
+diff --git a/app/api/integrations/intranet/route.ts b/app/api/integrations/intranet/route.ts
+new file mode 100644
+index 0000000..9d5bb2e
+--- /dev/null
++++ b/app/api/integrations/intranet/route.ts
+@@ -0,0 +1,39 @@
++import { timingSafeEqual } from "node:crypto";
++import { listBaserowEmployees } from "@/lib/absensi/baserow";
++import { curatedSkus } from "@/lib/curated-catalogue";
++
++export const runtime = "nodejs";
++export const dynamic = "force-dynamic";
++const headers = { "Cache-Control": "private, no-store" };
++
++/** Read-only, minimal server-to-server projection. Never exports HR/biometric records. */
++export async function GET(request: Request) {
++  const expected = process.env.INTRANET_PORTAL_API_KEY || "";
++  const supplied = request.headers.get("authorization")?.replace(/^Bearer /, "") || "";
++  if (expected.length < 32 || Buffer.byteLength(supplied) !== Buffer.byteLength(expected)
++    || !timingSafeEqual(Buffer.from(supplied), Buffer.from(expected))) {
++    return Response.json({ error: "Unauthorized" }, { status: 401, headers });
++  }
++  const url = new URL(request.url);
++  if(url.searchParams.get("resource")==="catalogue-index"){
++    return Response.json({items:curatedSkus.map(p=>({brand:p.brandName,model:p.model,custom:p.custom,archived:!!p.archived}))},{headers});
++  }
++  if (url.searchParams.get("resource") === "catalogue") {
++    const brand = (url.searchParams.get("brand") || "").trim().toLowerCase();
++    const model = (url.searchParams.get("model") || "").trim().toLowerCase();
++    // Exact brand + model only; ambiguous matches are deliberately not guessed.
++    const matches = curatedSkus.filter(p => !p.custom && !p.archived
++      && p.brandName.trim().toLowerCase() === brand && p.model.trim().toLowerCase() === model);
++    return Response.json({ items: matches.map(p => ({ slug: p.slug, name: p.name, brand: p.brandName,
++      model: p.model, image: p.gallery[0] || null, description: p.blurb, specification: p.specification })) }, { headers });
++  }
++  try {
++    const employees = await listBaserowEmployees({ strict: true, signal: AbortSignal.timeout(12000) });
++    const items = employees.map(p => ({ id: String(p.rowId), name: p.name, email: p.email.trim().toLowerCase(),
++      company: p.company || "", department: p.department || "", active: p.active }));
++    if (new Set(items.map(p => p.email)).size !== items.length) throw new Error("Duplicate directory identity");
++    return Response.json({ source: "gastro-portal-baserow", complete: true, fetchedAt: new Date().toISOString(), items }, { headers });
++  } catch {
++    return Response.json({ error: "Direktori Portal belum tersedia. Coba kembali." }, { status: 503, headers });
++  }
++}

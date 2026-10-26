@@ -2,6 +2,8 @@
 
 Repository deployment ini: https://github.com/piemoul/gastro-intranet-promax. Source awal berasal dari `ko-indra/gastro-intranet` pada commit `b6b29ee`; histori Git dipertahankan.
 
+Untuk pull paket SQ/Manage Items ke deployment Koindra, baca [handoff environment dan dependensi Portal/WMS](koindra-deployment-handoff.md). Empat variabel API Intranet dan dua variabel layanan baca WMS ditambahkan pada milestone integrasi; fitur komersial berikutnya tidak menambah env baru. Nilai credential tetap privat.
+
 ## Konfigurasi privat
 
 Salin `.env.example` menjadi `.env.local`, lalu isi nilai pada mesin deployment. File itu diabaikan Git dan tidak disalin ke image Docker. Jangan memasukkan secret ke `NEXT_PUBLIC_*` atau dokumentasi.
